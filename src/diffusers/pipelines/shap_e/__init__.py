@@ -1,4 +1,7 @@
+from typing import TYPE_CHECKING
+
 from ...utils import (
+    DIFFUSERS_SLOW_IMPORT,
     OptionalDependencyNotAvailable,
     _LazyModule,
     get_objects_from_module,
@@ -7,9 +10,8 @@ from ...utils import (
 )
 
 
-_import_structure = {}
 _dummy_objects = {}
-
+_import_structure = {}
 
 try:
     if not (is_transformers_available() and is_torch_available()):
@@ -33,15 +35,37 @@ else:
         "VoidNeRFModel",
     ]
 
-import sys
+if TYPE_CHECKING or DIFFUSERS_SLOW_IMPORT:
+    try:
+        if not (is_transformers_available() and is_torch_available()):
+            raise OptionalDependencyNotAvailable()
 
+    except OptionalDependencyNotAvailable:
+        from ...utils.dummy_torch_and_transformers_objects import *
+    else:
+        from .camera import create_pan_cameras
+        from .pipeline_shap_e import ShapEPipeline
+        from .pipeline_shap_e_img2img import ShapEImg2ImgPipeline
+        from .renderer import (
+            BoundingBoxVolume,
+            ImportanceRaySampler,
+            MLPNeRFModelOutput,
+            MLPNeRSTFModel,
+            ShapEParamsProjModel,
+            ShapERenderer,
+            StratifiedRaySampler,
+            VoidNeRFModel,
+        )
 
-sys.modules[__name__] = _LazyModule(
-    __name__,
-    globals()["__file__"],
-    _import_structure,
-    module_spec=__spec__,
-)
+else:
+    import sys
 
-for name, value in _dummy_objects.items():
-    setattr(sys.modules[__name__], name, value)
+    sys.modules[__name__] = _LazyModule(
+        __name__,
+        globals()["__file__"],
+        _import_structure,
+        module_spec=__spec__,
+    )
+
+    for name, value in _dummy_objects.items():
+        setattr(sys.modules[__name__], name, value)

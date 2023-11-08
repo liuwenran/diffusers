@@ -1,8 +1,9 @@
-__version__ = "0.21.0.dev0"
+__version__ = "0.23.0.dev0"
 
 from typing import TYPE_CHECKING
 
 from .utils import (
+    DIFFUSERS_SLOW_IMPORT,
     OptionalDependencyNotAvailable,
     _LazyModule,
     is_flax_available,
@@ -78,6 +79,7 @@ else:
             "AutoencoderTiny",
             "ControlNetModel",
             "ModelMixin",
+            "MotionAdapter",
             "MultiAdapter",
             "PriorTransformer",
             "T2IAdapter",
@@ -87,6 +89,7 @@ else:
             "UNet2DConditionModel",
             "UNet2DModel",
             "UNet3DConditionModel",
+            "UNetMotionModel",
             "VQModel",
         ]
     )
@@ -141,6 +144,7 @@ else:
             "KarrasVeScheduler",
             "KDPM2AncestralDiscreteScheduler",
             "KDPM2DiscreteScheduler",
+            "LCMScheduler",
             "PNDMScheduler",
             "RePaintScheduler",
             "SchedulerMixin",
@@ -193,10 +197,14 @@ else:
         [
             "AltDiffusionImg2ImgPipeline",
             "AltDiffusionPipeline",
+            "AnimateDiffPipeline",
             "AudioLDM2Pipeline",
             "AudioLDM2ProjectionModel",
             "AudioLDM2UNet2DConditionModel",
             "AudioLDMPipeline",
+            "BlipDiffusionControlNetPipeline",
+            "BlipDiffusionPipeline",
+            "CLIPImageProjection",
             "CycleDiffusionPipeline",
             "IFImg2ImgPipeline",
             "IFImg2ImgSuperResolutionPipeline",
@@ -222,9 +230,12 @@ else:
             "KandinskyV22Pipeline",
             "KandinskyV22PriorEmb2EmbPipeline",
             "KandinskyV22PriorPipeline",
+            "LatentConsistencyModelImg2ImgPipeline",
+            "LatentConsistencyModelPipeline",
             "LDMTextToImagePipeline",
             "MusicLDMPipeline",
             "PaintByExamplePipeline",
+            "PixArtAlphaPipeline",
             "SemanticStableDiffusionPipeline",
             "ShapEImg2ImgPipeline",
             "ShapEPipeline",
@@ -235,7 +246,6 @@ else:
             "StableDiffusionControlNetPipeline",
             "StableDiffusionDepth2ImgPipeline",
             "StableDiffusionDiffEditPipeline",
-            "StableDiffusionGLIGENPipeline",
             "StableDiffusionGLIGENPipeline",
             "StableDiffusionGLIGENTextImagePipeline",
             "StableDiffusionImageVariationPipeline",
@@ -366,6 +376,7 @@ else:
             "FlaxDDIMScheduler",
             "FlaxDDPMScheduler",
             "FlaxDPMSolverMultistepScheduler",
+            "FlaxEulerDiscreteScheduler",
             "FlaxKarrasVeScheduler",
             "FlaxLMSDiscreteScheduler",
             "FlaxPNDMScheduler",
@@ -393,6 +404,7 @@ else:
             "FlaxStableDiffusionImg2ImgPipeline",
             "FlaxStableDiffusionInpaintPipeline",
             "FlaxStableDiffusionPipeline",
+            "FlaxStableDiffusionXLPipeline",
         ]
     )
 
@@ -410,7 +422,7 @@ except OptionalDependencyNotAvailable:
 else:
     _import_structure["pipelines"].extend(["MidiProcessor"])
 
-if TYPE_CHECKING:
+if TYPE_CHECKING or DIFFUSERS_SLOW_IMPORT:
     from .configuration_utils import ConfigMixin
 
     try:
@@ -433,6 +445,7 @@ if TYPE_CHECKING:
             AutoencoderTiny,
             ControlNetModel,
             ModelMixin,
+            MotionAdapter,
             MultiAdapter,
             PriorTransformer,
             T2IAdapter,
@@ -442,6 +455,7 @@ if TYPE_CHECKING:
             UNet2DConditionModel,
             UNet2DModel,
             UNet3DConditionModel,
+            UNetMotionModel,
             VQModel,
         )
         from .optimization import (
@@ -458,6 +472,8 @@ if TYPE_CHECKING:
             AutoPipelineForImage2Image,
             AutoPipelineForInpainting,
             AutoPipelineForText2Image,
+            BlipDiffusionControlNetPipeline,
+            BlipDiffusionPipeline,
             CLIPImageProjection,
             ConsistencyModelPipeline,
             DanceDiffusionPipeline,
@@ -492,6 +508,7 @@ if TYPE_CHECKING:
             KarrasVeScheduler,
             KDPM2AncestralDiscreteScheduler,
             KDPM2DiscreteScheduler,
+            LCMScheduler,
             PNDMScheduler,
             RePaintScheduler,
             SchedulerMixin,
@@ -527,10 +544,12 @@ if TYPE_CHECKING:
         from .pipelines import (
             AltDiffusionImg2ImgPipeline,
             AltDiffusionPipeline,
+            AnimateDiffPipeline,
             AudioLDM2Pipeline,
             AudioLDM2ProjectionModel,
             AudioLDM2UNet2DConditionModel,
             AudioLDMPipeline,
+            CLIPImageProjection,
             CycleDiffusionPipeline,
             IFImg2ImgPipeline,
             IFImg2ImgSuperResolutionPipeline,
@@ -556,9 +575,12 @@ if TYPE_CHECKING:
             KandinskyV22Pipeline,
             KandinskyV22PriorEmb2EmbPipeline,
             KandinskyV22PriorPipeline,
+            LatentConsistencyModelImg2ImgPipeline,
+            LatentConsistencyModelPipeline,
             LDMTextToImagePipeline,
             MusicLDMPipeline,
             PaintByExamplePipeline,
+            PixArtAlphaPipeline,
             SemanticStableDiffusionPipeline,
             ShapEImg2ImgPipeline,
             ShapEPipeline,
@@ -668,6 +690,7 @@ if TYPE_CHECKING:
             FlaxDDIMScheduler,
             FlaxDDPMScheduler,
             FlaxDPMSolverMultistepScheduler,
+            FlaxEulerDiscreteScheduler,
             FlaxKarrasVeScheduler,
             FlaxLMSDiscreteScheduler,
             FlaxPNDMScheduler,
@@ -686,6 +709,7 @@ if TYPE_CHECKING:
             FlaxStableDiffusionImg2ImgPipeline,
             FlaxStableDiffusionInpaintPipeline,
             FlaxStableDiffusionPipeline,
+            FlaxStableDiffusionXLPipeline,
         )
 
     try:

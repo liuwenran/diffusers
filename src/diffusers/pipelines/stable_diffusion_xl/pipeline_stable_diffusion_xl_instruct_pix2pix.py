@@ -20,7 +20,7 @@ import torch
 from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
 
 from ...image_processor import PipelineImageInput, VaeImageProcessor
-from ...loaders import FromSingleFileMixin, LoraLoaderMixin, TextualInversionLoaderMixin
+from ...loaders import FromSingleFileMixin, StableDiffusionXLLoraLoaderMixin, TextualInversionLoaderMixin
 from ...models import AutoencoderKL, UNet2DConditionModel
 from ...models.attention_processor import (
     AttnProcessor2_0,
@@ -31,18 +31,28 @@ from ...models.attention_processor import (
 from ...models.lora import adjust_lora_scale_text_encoder
 from ...schedulers import KarrasDiffusionSchedulers
 from ...utils import (
+    USE_PEFT_BACKEND,
     deprecate,
     is_invisible_watermark_available,
+    is_torch_xla_available,
     logging,
     replace_example_docstring,
+    scale_lora_layers,
 )
 from ...utils.torch_utils import randn_tensor
 from ..pipeline_utils import DiffusionPipeline
-from . import StableDiffusionXLPipelineOutput
+from .pipeline_output import StableDiffusionXLPipelineOutput
 
 
 if is_invisible_watermark_available():
     from .watermark import StableDiffusionXLWatermarker
+
+if is_torch_xla_available():
+    import torch_xla.core.xla_model as xm
+
+    XLA_AVAILABLE = True
+else:
+    XLA_AVAILABLE = False
 
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
@@ -93,7 +103,7 @@ def rescale_noise_cfg(noise_cfg, noise_pred_text, guidance_rescale=0.0):
 
 
 class StableDiffusionXLInstructPix2PixPipeline(
-    DiffusionPipeline, TextualInversionLoaderMixin, LoraLoaderMixin, FromSingleFileMixin
+    DiffusionPipeline, TextualInversionLoaderMixin, FromSingleFileMixin, StableDiffusionXLLoraLoaderMixin
 ):
     r"""
     Pipeline for pixel-level image editing by following text instructions. Based on Stable Diffusion XL.
@@ -102,10 +112,10 @@ class StableDiffusionXLInstructPix2PixPipeline(
     library implements for all the pipelines (such as downloading or saving, running on a particular device, etc.)
 
     In addition the pipeline inherits the following loading methods:
-        - *LoRA*: [`loaders.LoraLoaderMixin.load_lora_weights`]
+        - *LoRA*: [`loaders.StableDiffusionXLLoraLoaderMixin.load_lora_weights`]
 
     as well as the following saving methods:
-        - *LoRA*: [`loaders.LoraLoaderMixin.save_lora_weights`]
+        - *LoRA*: [`loaders.StableDiffusionXLLoraLoaderMixin.save_lora_weights`]
 
     Args:
         vae ([`AutoencoderKL`]):
@@ -142,6 +152,7 @@ class StableDiffusionXLInstructPix2PixPipeline(
             watermarker will be used.
     """
     model_cpu_offload_seq = "text_encoder->text_encoder_2->unet->vae"
+    _optional_components = ["tokenizer", "tokenizer_2", "text_encoder", "text_encoder_2"]
 
     def __init__(
         self,
@@ -268,12 +279,21 @@ class StableDiffusionXLInstructPix2PixPipeline(
 
         # set lora scale so that monkey patched LoRA
         # function of text encoder can correctly access it
-        if lora_scale is not None and isinstance(self, LoraLoaderMixin):
+        if lora_scale is not None and isinstance(self, StableDiffusionXLLoraLoaderMixin):
             self._lora_scale = lora_scale
 
             # dynamically adjust the LoRA scale
-            adjust_lora_scale_text_encoder(self.text_encoder, lora_scale)
-            adjust_lora_scale_text_encoder(self.text_encoder_2, lora_scale)
+            if self.text_encoder is not None:
+                if not USE_PEFT_BACKEND:
+                    adjust_lora_scale_text_encoder(self.text_encoder, lora_scale)
+                else:
+                    scale_lora_layers(self.text_encoder, lora_scale)
+
+            if self.text_encoder_2 is not None:
+                if not USE_PEFT_BACKEND:
+                    adjust_lora_scale_text_encoder(self.text_encoder_2, lora_scale)
+                else:
+                    scale_lora_layers(self.text_encoder_2, lora_scale)
 
         if prompt is not None and isinstance(prompt, str):
             batch_size = 1
@@ -382,7 +402,8 @@ class StableDiffusionXLInstructPix2PixPipeline(
 
             negative_prompt_embeds = torch.concat(negative_prompt_embeds_list, dim=-1)
 
-        prompt_embeds = prompt_embeds.to(dtype=self.text_encoder_2.dtype, device=device)
+        prompt_embeds_dtype = self.text_encoder_2.dtype if self.text_encoder_2 is not None else self.unet.dtype
+        prompt_embeds = prompt_embeds.to(dtype=prompt_embeds_dtype, device=device)
         bs_embed, seq_len, _ = prompt_embeds.shape
         # duplicate text embeddings for each generation per prompt, using mps friendly method
         prompt_embeds = prompt_embeds.repeat(1, num_images_per_prompt, 1)
@@ -391,7 +412,7 @@ class StableDiffusionXLInstructPix2PixPipeline(
         if do_classifier_free_guidance:
             # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
             seq_len = negative_prompt_embeds.shape[1]
-            negative_prompt_embeds = negative_prompt_embeds.to(dtype=self.text_encoder_2.dtype, device=device)
+            negative_prompt_embeds = negative_prompt_embeds.to(dtype=prompt_embeds_dtype, device=device)
             negative_prompt_embeds = negative_prompt_embeds.repeat(1, num_images_per_prompt, 1)
             negative_prompt_embeds = negative_prompt_embeds.view(batch_size * num_images_per_prompt, seq_len, -1)
 
@@ -425,14 +446,25 @@ class StableDiffusionXLInstructPix2PixPipeline(
 
     # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_instruct_pix2pix.StableDiffusionInstructPix2PixPipeline.check_inputs
     def check_inputs(
-        self, prompt, callback_steps, negative_prompt=None, prompt_embeds=None, negative_prompt_embeds=None
+        self,
+        prompt,
+        callback_steps,
+        negative_prompt=None,
+        prompt_embeds=None,
+        negative_prompt_embeds=None,
+        callback_on_step_end_tensor_inputs=None,
     ):
-        if (callback_steps is None) or (
-            callback_steps is not None and (not isinstance(callback_steps, int) or callback_steps <= 0)
-        ):
+        if callback_steps is not None and (not isinstance(callback_steps, int) or callback_steps <= 0):
             raise ValueError(
                 f"`callback_steps` has to be a positive integer but is {callback_steps} of type"
                 f" {type(callback_steps)}."
+            )
+
+        if callback_on_step_end_tensor_inputs is not None and not all(
+            k in self._callback_tensor_inputs for k in callback_on_step_end_tensor_inputs
+        ):
+            raise ValueError(
+                f"`callback_on_step_end_tensor_inputs` has to be in {self._callback_tensor_inputs}, but found {[k for k in callback_on_step_end_tensor_inputs if k not in self._callback_tensor_inputs]}"
             )
 
         if prompt is not None and prompt_embeds is not None:
@@ -495,7 +527,8 @@ class StableDiffusionXLInstructPix2PixPipeline(
             image_latents = image
         else:
             # make sure the VAE is in float32 mode, as it overflows in float16
-            if self.vae.dtype == torch.float16 and self.vae.config.force_upcast:
+            needs_upcasting = self.vae.dtype == torch.float16 and self.vae.config.force_upcast
+            if needs_upcasting:
                 self.upcast_vae()
                 image = image.to(next(iter(self.vae.post_quant_conv.parameters())).dtype)
 
@@ -510,6 +543,10 @@ class StableDiffusionXLInstructPix2PixPipeline(
                 image_latents = torch.cat(image_latents, dim=0)
             else:
                 image_latents = self.vae.encode(image).latent_dist.mode()
+
+            # cast back to fp16 if needed
+            if needs_upcasting:
+                self.vae.to(dtype=torch.float16)
 
         if batch_size > image_latents.shape[0] and batch_size % image_latents.shape[0] == 0:
             # expand image_latents for batch_size
@@ -533,14 +570,19 @@ class StableDiffusionXLInstructPix2PixPipeline(
             uncond_image_latents = torch.zeros_like(image_latents)
             image_latents = torch.cat([image_latents, image_latents, uncond_image_latents], dim=0)
 
+        if image_latents.dtype != self.vae.dtype:
+            image_latents = image_latents.to(dtype=self.vae.dtype)
+
         return image_latents
 
     # Copied from diffusers.pipelines.stable_diffusion_xl.pipeline_stable_diffusion_xl.StableDiffusionXLPipeline._get_add_time_ids
-    def _get_add_time_ids(self, original_size, crops_coords_top_left, target_size, dtype):
+    def _get_add_time_ids(
+        self, original_size, crops_coords_top_left, target_size, dtype, text_encoder_projection_dim=None
+    ):
         add_time_ids = list(original_size + crops_coords_top_left + target_size)
 
         passed_add_embed_dim = (
-            self.unet.config.addition_time_embed_dim * len(add_time_ids) + self.text_encoder_2.config.projection_dim
+            self.unet.config.addition_time_embed_dim * len(add_time_ids) + text_encoder_projection_dim
         )
         expected_add_embed_dim = self.unet.add_embedding.linear_1.in_features
 
@@ -571,6 +613,34 @@ class StableDiffusionXLInstructPix2PixPipeline(
             self.vae.post_quant_conv.to(dtype)
             self.vae.decoder.conv_in.to(dtype)
             self.vae.decoder.mid_block.to(dtype)
+
+    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.enable_freeu
+    def enable_freeu(self, s1: float, s2: float, b1: float, b2: float):
+        r"""Enables the FreeU mechanism as in https://arxiv.org/abs/2309.11497.
+
+        The suffixes after the scaling factors represent the stages where they are being applied.
+
+        Please refer to the [official repository](https://github.com/ChenyangSi/FreeU) for combinations of the values
+        that are known to work well for different pipelines such as Stable Diffusion v1, v2, and Stable Diffusion XL.
+
+        Args:
+            s1 (`float`):
+                Scaling factor for stage 1 to attenuate the contributions of the skip features. This is done to
+                mitigate "oversmoothing effect" in the enhanced denoising process.
+            s2 (`float`):
+                Scaling factor for stage 2 to attenuate the contributions of the skip features. This is done to
+                mitigate "oversmoothing effect" in the enhanced denoising process.
+            b1 (`float`): Scaling factor for stage 1 to amplify the contributions of backbone features.
+            b2 (`float`): Scaling factor for stage 2 to amplify the contributions of backbone features.
+        """
+        if not hasattr(self, "unet"):
+            raise ValueError("The pipeline must have `unet` for using FreeU.")
+        self.unet.enable_freeu(s1=s1, s2=s2, b1=b1, b2=b2)
+
+    # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.disable_freeu
+    def disable_freeu(self):
+        """Disables the FreeU mechanism if enabled."""
+        self.unet.disable_freeu()
 
     @torch.no_grad()
     @replace_example_docstring(EXAMPLE_DOC_STRING)
@@ -691,14 +761,14 @@ class StableDiffusionXLInstructPix2PixPipeline(
                 A kwargs dictionary that if specified is passed along to the `AttentionProcessor` as defined under
                 `self.processor` in
                 [diffusers.models.attention_processor](https://github.com/huggingface/diffusers/blob/main/src/diffusers/models/attention_processor.py).
-            guidance_rescale (`float`, *optional*, defaults to 0.7):
+            guidance_rescale (`float`, *optional*, defaults to 0.0):
                 Guidance rescale factor proposed by [Common Diffusion Noise Schedules and Sample Steps are
                 Flawed](https://arxiv.org/pdf/2305.08891.pdf) `guidance_scale` is defined as `φ` in equation 16. of
                 [Common Diffusion Noise Schedules and Sample Steps are Flawed](https://arxiv.org/pdf/2305.08891.pdf).
                 Guidance rescale factor should fix overexposure when using zero terminal SNR.
             original_size (`Tuple[int]`, *optional*, defaults to (1024, 1024)):
                 If `original_size` is not the same as `target_size` the image will appear to be down- or upsampled.
-                `original_size` defaults to `(width, height)` if not specified. Part of SDXL's micro-conditioning as
+                `original_size` defaults to `(height, width)` if not specified. Part of SDXL's micro-conditioning as
                 explained in section 2.2 of
                 [https://huggingface.co/papers/2307.01952](https://huggingface.co/papers/2307.01952).
             crops_coords_top_left (`Tuple[int]`, *optional*, defaults to (0, 0)):
@@ -708,8 +778,16 @@ class StableDiffusionXLInstructPix2PixPipeline(
                 [https://huggingface.co/papers/2307.01952](https://huggingface.co/papers/2307.01952).
             target_size (`Tuple[int]`, *optional*, defaults to (1024, 1024)):
                 For most cases, `target_size` should be set to the desired height and width of the generated image. If
-                not specified it will default to `(width, height)`. Part of SDXL's micro-conditioning as explained in
+                not specified it will default to `(height, width)`. Part of SDXL's micro-conditioning as explained in
                 section 2.2 of [https://huggingface.co/papers/2307.01952](https://huggingface.co/papers/2307.01952).
+            aesthetic_score (`float`, *optional*, defaults to 6.0):
+                Used to simulate an aesthetic score of the generated image by influencing the positive text condition.
+                Part of SDXL's micro-conditioning as explained in section 2.2 of
+                [https://huggingface.co/papers/2307.01952](https://huggingface.co/papers/2307.01952).
+            negative_aesthetic_score (`float`, *optional*, defaults to 2.5):
+                Part of SDXL's micro-conditioning as explained in section 2.2 of
+                [https://huggingface.co/papers/2307.01952](https://huggingface.co/papers/2307.01952). Can be used to
+                simulate an aesthetic score of the generated image by influencing the negative text condition.
 
         Examples:
 
@@ -819,8 +897,17 @@ class StableDiffusionXLInstructPix2PixPipeline(
 
         # 10. Prepare added time ids & embeddings
         add_text_embeds = pooled_prompt_embeds
+        if self.text_encoder_2 is None:
+            text_encoder_projection_dim = int(pooled_prompt_embeds.shape[-1])
+        else:
+            text_encoder_projection_dim = self.text_encoder_2.config.projection_dim
+
         add_time_ids = self._get_add_time_ids(
-            original_size, crops_coords_top_left, target_size, dtype=prompt_embeds.dtype
+            original_size,
+            crops_coords_top_left,
+            target_size,
+            dtype=prompt_embeds.dtype,
+            text_encoder_projection_dim=text_encoder_projection_dim,
         )
 
         if do_classifier_free_guidance:
@@ -837,7 +924,7 @@ class StableDiffusionXLInstructPix2PixPipeline(
 
         # 11. Denoising loop
         num_warmup_steps = max(len(timesteps) - num_inference_steps * self.scheduler.order, 0)
-        if denoising_end is not None and type(denoising_end) == float and denoising_end > 0 and denoising_end < 1:
+        if denoising_end is not None and isinstance(denoising_end, float) and denoising_end > 0 and denoising_end < 1:
             discrete_timestep_cutoff = int(
                 round(
                     self.scheduler.config.num_train_timesteps
@@ -907,7 +994,11 @@ class StableDiffusionXLInstructPix2PixPipeline(
                 if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
                     progress_bar.update()
                     if callback is not None and i % callback_steps == 0:
-                        callback(i, t, latents)
+                        step_idx = i // getattr(self.scheduler, "order", 1)
+                        callback(step_idx, t, latents)
+
+                if XLA_AVAILABLE:
+                    xm.mark_step()
 
         if not output_type == "latent":
             # make sure the VAE is in float32 mode, as it overflows in float16

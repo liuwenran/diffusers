@@ -11,13 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Callable, List, Optional, Union
+from typing import Callable, Dict, List, Optional, Union
 
 import torch
 from transformers import CLIPTextModel, CLIPTokenizer
 
 from ...schedulers import DDPMWuerstchenScheduler
-from ...utils import replace_example_docstring
+from ...utils import deprecate, replace_example_docstring
 from ..pipeline_utils import DiffusionPipeline
 from .modeling_paella_vq_model import PaellaVQModel
 from .modeling_wuerstchen_diffnext import WuerstchenDiffNeXt
@@ -62,7 +62,7 @@ class WuerstchenCombinedPipeline(DiffusionPipeline):
             The prior tokenizer to be used for text inputs.
         prior_text_encoder (`CLIPTextModel`):
             The prior text encoder to be used for text inputs.
-        prior (`WuerstchenPrior`):
+        prior_prior (`WuerstchenPrior`):
             The prior model to be used for prior pipeline.
         prior_scheduler (`DDPMWuerstchenScheduler`):
             The scheduler to be used for prior pipeline.
@@ -119,8 +119,8 @@ class WuerstchenCombinedPipeline(DiffusionPipeline):
         method is called, and the model remains in GPU until the next model runs. Memory savings are lower than with
         `enable_sequential_cpu_offload`, but performance is much better due to the iterative execution of the `unet`.
         """
-        self.prior_pipe.enable_model_cpu_offload()
-        self.decoder_pipe.enable_model_cpu_offload()
+        self.prior_pipe.enable_model_cpu_offload(gpu_id=gpu_id)
+        self.decoder_pipe.enable_model_cpu_offload(gpu_id=gpu_id)
 
     def enable_sequential_cpu_offload(self, gpu_id=0):
         r"""
@@ -144,7 +144,7 @@ class WuerstchenCombinedPipeline(DiffusionPipeline):
     @replace_example_docstring(TEXT2IMAGE_EXAMPLE_DOC_STRING)
     def __call__(
         self,
-        prompt: Union[str, List[str]],
+        prompt: Optional[Union[str, List[str]]] = None,
         height: int = 512,
         width: int = 512,
         prior_num_inference_steps: int = 60,
@@ -154,21 +154,35 @@ class WuerstchenCombinedPipeline(DiffusionPipeline):
         decoder_timesteps: Optional[List[float]] = None,
         decoder_guidance_scale: float = 0.0,
         negative_prompt: Optional[Union[str, List[str]]] = None,
+        prompt_embeds: Optional[torch.FloatTensor] = None,
+        negative_prompt_embeds: Optional[torch.FloatTensor] = None,
         num_images_per_prompt: int = 1,
         generator: Optional[Union[torch.Generator, List[torch.Generator]]] = None,
         latents: Optional[torch.FloatTensor] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
+        prior_callback_on_step_end: Optional[Callable[[int, int, Dict], None]] = None,
+        prior_callback_on_step_end_tensor_inputs: List[str] = ["latents"],
+        callback_on_step_end: Optional[Callable[[int, int, Dict], None]] = None,
+        callback_on_step_end_tensor_inputs: List[str] = ["latents"],
+        **kwargs,
     ):
         """
         Function invoked when calling the pipeline for generation.
 
         Args:
             prompt (`str` or `List[str]`):
-                The prompt or prompts to guide the image generation.
+                The prompt or prompts to guide the image generation for the prior and decoder.
             negative_prompt (`str` or `List[str]`, *optional*):
                 The prompt or prompts not to guide the image generation. Ignored when not using guidance (i.e., ignored
                 if `guidance_scale` is less than `1`).
+            prompt_embeds (`torch.FloatTensor`, *optional*):
+                Pre-generated text embeddings for the prior. Can be used to easily tweak text inputs, *e.g.* prompt
+                weighting. If not provided, text embeddings will be generated from `prompt` input argument.
+            negative_prompt_embeds (`torch.FloatTensor`, *optional*):
+                Pre-generated negative text embeddings for the prior. Can be used to easily tweak text inputs, *e.g.*
+                prompt weighting. If not provided, negative_prompt_embeds will be generated from `negative_prompt`
+                input argument.
             num_images_per_prompt (`int`, *optional*, defaults to 1):
                 The number of images to generate per prompt.
             height (`int`, *optional*, defaults to 512):
@@ -181,7 +195,7 @@ class WuerstchenCombinedPipeline(DiffusionPipeline):
                 Paper](https://arxiv.org/pdf/2205.11487.pdf). Guidance scale is enabled by setting
                 `prior_guidance_scale > 1`. Higher guidance scale encourages to generate images that are closely linked
                 to the text `prompt`, usually at the expense of lower image quality.
-            prior_num_inference_steps (`Union[int, Dict[float, int]]`, *optional*, defaults to 30):
+            prior_num_inference_steps (`Union[int, Dict[float, int]]`, *optional*, defaults to 60):
                 The number of prior denoising steps. More denoising steps usually lead to a higher quality image at the
                 expense of slower inference. For more specific timestep spacing, you can pass customized
                 `prior_timesteps`
@@ -213,6 +227,23 @@ class WuerstchenCombinedPipeline(DiffusionPipeline):
                 (`np.array`) or `"pt"` (`torch.Tensor`).
             return_dict (`bool`, *optional*, defaults to `True`):
                 Whether or not to return a [`~pipelines.ImagePipelineOutput`] instead of a plain tuple.
+            prior_callback_on_step_end (`Callable`, *optional*):
+                A function that calls at the end of each denoising steps during the inference. The function is called
+                with the following arguments: `prior_callback_on_step_end(self: DiffusionPipeline, step: int, timestep:
+                int, callback_kwargs: Dict)`.
+            prior_callback_on_step_end_tensor_inputs (`List`, *optional*):
+                The list of tensor inputs for the `prior_callback_on_step_end` function. The tensors specified in the
+                list will be passed as `callback_kwargs` argument. You will only be able to include variables listed in
+                the `._callback_tensor_inputs` attribute of your pipeine class.
+            callback_on_step_end (`Callable`, *optional*):
+                A function that calls at the end of each denoising steps during the inference. The function is called
+                with the following arguments: `callback_on_step_end(self: DiffusionPipeline, step: int, timestep: int,
+                callback_kwargs: Dict)`. `callback_kwargs` will include a list of all tensors as specified by
+                `callback_on_step_end_tensor_inputs`.
+            callback_on_step_end_tensor_inputs (`List`, *optional*):
+                The list of tensor inputs for the `callback_on_step_end` function. The tensors specified in the list
+                will be passed as `callback_kwargs` argument. You will only be able to include variables listed in the
+                `._callback_tensor_inputs` attribute of your pipeine class.
 
         Examples:
 
@@ -220,25 +251,46 @@ class WuerstchenCombinedPipeline(DiffusionPipeline):
             [`~pipelines.ImagePipelineOutput`] or `tuple` [`~pipelines.ImagePipelineOutput`] if `return_dict` is True,
             otherwise a `tuple`. When returning a tuple, the first element is a list with the generated images.
         """
+        prior_kwargs = {}
+        if kwargs.get("prior_callback", None) is not None:
+            prior_kwargs["callback"] = kwargs.pop("prior_callback")
+            deprecate(
+                "prior_callback",
+                "1.0.0",
+                "Passing `prior_callback` as an input argument to `__call__` is deprecated, consider use `prior_callback_on_step_end`",
+            )
+        if kwargs.get("prior_callback_steps", None) is not None:
+            deprecate(
+                "prior_callback_steps",
+                "1.0.0",
+                "Passing `prior_callback_steps` as an input argument to `__call__` is deprecated, consider use `prior_callback_on_step_end`",
+            )
+            prior_kwargs["callback_steps"] = kwargs.pop("prior_callback_steps")
+
         prior_outputs = self.prior_pipe(
-            prompt=prompt,
+            prompt=prompt if prompt_embeds is None else None,
             height=height,
             width=width,
             num_inference_steps=prior_num_inference_steps,
             timesteps=prior_timesteps,
             guidance_scale=prior_guidance_scale,
-            negative_prompt=negative_prompt,
+            negative_prompt=negative_prompt if negative_prompt_embeds is None else None,
+            prompt_embeds=prompt_embeds,
+            negative_prompt_embeds=negative_prompt_embeds,
             num_images_per_prompt=num_images_per_prompt,
             generator=generator,
             latents=latents,
             output_type="pt",
             return_dict=False,
+            callback_on_step_end=prior_callback_on_step_end,
+            callback_on_step_end_tensor_inputs=prior_callback_on_step_end_tensor_inputs,
+            **prior_kwargs,
         )
         image_embeddings = prior_outputs[0]
 
         outputs = self.decoder_pipe(
             image_embeddings=image_embeddings,
-            prompt=prompt,
+            prompt=prompt if prompt is not None else "",
             num_inference_steps=num_inference_steps,
             timesteps=decoder_timesteps,
             guidance_scale=decoder_guidance_scale,
@@ -246,5 +298,9 @@ class WuerstchenCombinedPipeline(DiffusionPipeline):
             generator=generator,
             output_type=output_type,
             return_dict=return_dict,
+            callback_on_step_end=callback_on_step_end,
+            callback_on_step_end_tensor_inputs=callback_on_step_end_tensor_inputs,
+            **kwargs,
         )
+
         return outputs

@@ -12,7 +12,7 @@ from ...schedulers import KarrasDiffusionSchedulers
 from ...utils import deprecate, logging
 from ...utils.torch_utils import randn_tensor
 from ..pipeline_utils import DiffusionPipeline
-from . import SemanticStableDiffusionPipelineOutput
+from .pipeline_output import SemanticStableDiffusionPipelineOutput
 
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
@@ -146,16 +146,21 @@ class SemanticStableDiffusionPipeline(DiffusionPipeline):
         negative_prompt=None,
         prompt_embeds=None,
         negative_prompt_embeds=None,
+        callback_on_step_end_tensor_inputs=None,
     ):
         if height % 8 != 0 or width % 8 != 0:
             raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
 
-        if (callback_steps is None) or (
-            callback_steps is not None and (not isinstance(callback_steps, int) or callback_steps <= 0)
-        ):
+        if callback_steps is not None and (not isinstance(callback_steps, int) or callback_steps <= 0):
             raise ValueError(
                 f"`callback_steps` has to be a positive integer but is {callback_steps} of type"
                 f" {type(callback_steps)}."
+            )
+        if callback_on_step_end_tensor_inputs is not None and not all(
+            k in self._callback_tensor_inputs for k in callback_on_step_end_tensor_inputs
+        ):
+            raise ValueError(
+                f"`callback_on_step_end_tensor_inputs` has to be in {self._callback_tensor_inputs}, but found {[k for k in callback_on_step_end_tensor_inputs if k not in self._callback_tensor_inputs]}"
             )
 
         if prompt is not None and prompt_embeds is not None:
@@ -689,7 +694,8 @@ class SemanticStableDiffusionPipeline(DiffusionPipeline):
 
             # call the callback, if provided
             if callback is not None and i % callback_steps == 0:
-                callback(i, t, latents)
+                step_idx = i // getattr(self.scheduler, "order", 1)
+                callback(step_idx, t, latents)
 
         # 8. Post-processing
         if not output_type == "latent":

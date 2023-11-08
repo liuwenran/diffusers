@@ -43,6 +43,7 @@ class WuerstchenDecoderPipelineFastTests(PipelineTesterMixin, unittest.TestCase)
         "return_dict",
     ]
     test_xformers_attention = False
+    callback_cfg_params = ["image_embeddings", "text_encoder_hidden_states"]
 
     @property
     def text_embedder_hidden_size(self):
@@ -170,15 +171,7 @@ class WuerstchenDecoderPipelineFastTests(PipelineTesterMixin, unittest.TestCase)
 
     @skip_mps
     def test_inference_batch_single_identical(self):
-        test_max_difference = torch_device == "cpu"
-        relax_max_difference = True
-        test_mean_pixel_difference = False
-
-        self._test_inference_batch_single_identical(
-            test_max_difference=test_max_difference,
-            relax_max_difference=relax_max_difference,
-            test_mean_pixel_difference=test_mean_pixel_difference,
-        )
+        self._test_inference_batch_single_identical(expected_max_diff=1e-5)
 
     @skip_mps
     def test_attention_slicing_forward_pass(self):
