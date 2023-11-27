@@ -236,6 +236,24 @@ def parse_args(input_args=None):
         ),
     )
     parser.add_argument(
+        "--resolution_h",
+        type=int,
+        default=1024,
+        help=(
+            "The resolution h for input images, all the images in the train/validation dataset will be resized to this"
+            " resolution"
+        ),
+    )
+    parser.add_argument(
+        "--resolution_w",
+        type=int,
+        default=1024,
+        help=(
+            "The resolution wfor input images, all the images in the train/validation dataset will be resized to this"
+            " resolution"
+        ),
+    )
+    parser.add_argument(
         "--center_crop",
         default=False,
         action="store_true",
@@ -824,8 +842,8 @@ def main(args):
         return tokens_one, tokens_two
 
     # Preprocessing the datasets.
-    train_resize = transforms.Resize(args.resolution, interpolation=transforms.InterpolationMode.BILINEAR)
-    train_crop = transforms.CenterCrop(args.resolution) if args.center_crop else transforms.RandomCrop(args.resolution)
+    train_resize = transforms.Resize((args.resolution_h, args.resolution_w), interpolation=transforms.InterpolationMode.BILINEAR)
+    train_crop = transforms.CenterCrop((args.resolution_h, args.resolution_w)) if args.center_crop else transforms.RandomCrop((args.resolution_h, args.resolution_w))
     train_flip = transforms.RandomHorizontalFlip(p=1.0)
     train_transforms = transforms.Compose(
         [
@@ -844,11 +862,11 @@ def main(args):
             original_sizes.append((image.height, image.width))
             image = train_resize(image)
             if args.center_crop:
-                y1 = max(0, int(round((image.height - args.resolution) / 2.0)))
-                x1 = max(0, int(round((image.width - args.resolution) / 2.0)))
+                y1 = max(0, int(round((image.height - args.resolution_h) / 2.0)))
+                x1 = max(0, int(round((image.width - args.resolution_w) / 2.0)))
                 image = train_crop(image)
             else:
-                y1, x1, h, w = train_crop.get_params(image, (args.resolution, args.resolution))
+                y1, x1, h, w = train_crop.get_params(image, (args.resolution_h, args.resolution_w))
                 image = crop(image, y1, x1, h, w)
             if args.random_flip and random.random() < 0.5:
                 # flip
@@ -1023,7 +1041,7 @@ def main(args):
                 # time ids
                 def compute_time_ids(original_size, crops_coords_top_left):
                     # Adapted from pipeline.StableDiffusionXLPipeline._get_add_time_ids
-                    target_size = (args.resolution, args.resolution)
+                    target_size = (args.resolution_h, args.resolution_w)
                     add_time_ids = list(original_size + crops_coords_top_left + target_size)
                     add_time_ids = torch.tensor([add_time_ids])
                     add_time_ids = add_time_ids.to(accelerator.device, dtype=weight_dtype)
