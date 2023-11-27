@@ -1,4 +1,4 @@
-__version__ = "0.23.0.dev0"
+__version__ = "0.24.0.dev0"
 
 from typing import TYPE_CHECKING
 
@@ -77,7 +77,9 @@ else:
             "AsymmetricAutoencoderKL",
             "AutoencoderKL",
             "AutoencoderTiny",
+            "ConsistencyDecoderVAE",
             "ControlNetModel",
+            "Kandinsky3UNet",
             "ModelMixin",
             "MotionAdapter",
             "MultiAdapter",
@@ -93,6 +95,7 @@ else:
             "VQModel",
         ]
     )
+
     _import_structure["optimization"] = [
         "get_constant_schedule",
         "get_constant_schedule_with_warmup",
@@ -102,7 +105,6 @@ else:
         "get_polynomial_decay_schedule_with_warmup",
         "get_scheduler",
     ]
-
     _import_structure["pipelines"].extend(
         [
             "AudioPipelineOutput",
@@ -213,6 +215,8 @@ else:
             "IFPipeline",
             "IFSuperResolutionPipeline",
             "ImageTextPipelineOutput",
+            "Kandinsky3Img2ImgPipeline",
+            "Kandinsky3Pipeline",
             "KandinskyCombinedPipeline",
             "KandinskyImg2ImgCombinedPipeline",
             "KandinskyImg2ImgPipeline",
@@ -443,7 +447,9 @@ if TYPE_CHECKING or DIFFUSERS_SLOW_IMPORT:
             AsymmetricAutoencoderKL,
             AutoencoderKL,
             AutoencoderTiny,
+            ConsistencyDecoderVAE,
             ControlNetModel,
+            Kandinsky3UNet,
             ModelMixin,
             MotionAdapter,
             MultiAdapter,
@@ -558,6 +564,8 @@ if TYPE_CHECKING or DIFFUSERS_SLOW_IMPORT:
             IFPipeline,
             IFSuperResolutionPipeline,
             ImageTextPipelineOutput,
+            Kandinsky3Img2ImgPipeline,
+            Kandinsky3Pipeline,
             KandinskyCombinedPipeline,
             KandinskyImg2ImgCombinedPipeline,
             KandinskyImg2ImgPipeline,

@@ -1,6 +1,4 @@
-# Initially taken from Github's Python gitignore file
-results/
-work_dirs/
+# Initially taken from GitHub's Python gitignore file
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -11,6 +9,8 @@ __pycache__/
 *.so
 
 # tests and logs
+results/
+work_dirs/
 tests/fixtures/cached_*_text.txt
 logs/
 lightning_logs/
@@ -36,7 +36,7 @@ wheels/
 MANIFEST
 
 # PyInstaller
-#  Usually these files are written by a python script from a template
+#  Usually these files are written by a Python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
@@ -155,7 +155,7 @@ debug.env
 # vim
 .*.swp
 
-#ctags
+# ctags
 tags
 
 # pre-commit
@@ -166,6 +166,7 @@ tags
 
 # DS_Store (MacOS)
 .DS_Store
+
 # RL pipelines may produce mp4 outputs
 *.mp4
 
@@ -175,4 +176,5 @@ tags
 # ruff
 .ruff_cache
 
+# wandb
 wandb
