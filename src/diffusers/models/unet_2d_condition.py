@@ -49,7 +49,11 @@ from .unet_2d_blocks import (
     get_down_block,
     get_up_block,
 )
+from enum import Enum
+from diffusers.models.attention import BasicTransformerBlock
 
+
+AttentionStatus = Enum('ATTENTION_STATUS', 'READ WRITE DISABLE')
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -618,6 +622,26 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
                 positive_len=positive_len, out_dim=cross_attention_dim, feature_type=feature_type
             )
 
+        self.all_modules = self.torch_dfs(self)
+        self.attn_modules = [
+            module for module in self.all_modules
+            if isinstance(module, BasicTransformerBlock)
+        ]
+
+    def torch_dfs(self, model: torch.nn.Module):
+        result = [model]
+        for child in model.children():
+            result += self.torch_dfs(child)
+        return result
+
+    def set_attention_status(self, status):
+        for module in self.attn_modules:
+            module.set_attention_status(status)
+
+    def clear_bank(self):
+        for module in self.attn_modules:
+            module.clear_bank()
+
     @property
     def attn_processors(self) -> Dict[str, AttentionProcessor]:
         r"""
@@ -795,6 +819,58 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin)
                     setattr(upsample_block, k, None)
 
     def forward(
+        self,
+        sample: torch.FloatTensor,
+        timestep: Union[torch.Tensor, float, int],
+        encoder_hidden_states: torch.Tensor,
+        class_labels: Optional[torch.Tensor] = None,
+        timestep_cond: Optional[torch.Tensor] = None,
+        attention_mask: Optional[torch.Tensor] = None,
+        cross_attention_kwargs: Optional[Dict[str, Any]] = None,
+        added_cond_kwargs: Optional[Dict[str, torch.Tensor]] = None,
+        down_block_additional_residuals: Optional[Tuple[torch.Tensor]] = None,
+        mid_block_additional_residual: Optional[torch.Tensor] = None,
+        down_intrablock_additional_residuals: Optional[Tuple[torch.Tensor]] = None,
+        encoder_attention_mask: Optional[torch.Tensor] = None,
+        return_dict: bool = True,
+        ref_x: Optional[torch.Tensor] = None,
+    ) -> Union[UNet2DConditionOutput, Tuple]:
+        if ref_x is not None:
+            self.set_attention_status(True)
+            self.forward_inner(
+                sample=ref_x,
+                timestep=timestep,
+                encoder_hidden_states=encoder_hidden_states,
+                class_labels=class_labels,
+                timestep_cond=timestep_cond,
+                attention_mask=attention_mask,
+                cross_attention_kwargs=cross_attention_kwargs,
+                added_cond_kwargs=added_cond_kwargs,
+                down_block_additional_residuals=down_block_additional_residuals,
+                mid_block_additional_residual=mid_block_additional_residual,
+                down_intrablock_additional_residuals=down_intrablock_additional_residuals,
+                encoder_attention_mask=encoder_attention_mask,
+                return_dict=return_dict,
+            )
+        self.set_attention_status(False)
+        output = self.forward_inner(
+                sample=sample,
+                timestep=timestep,
+                encoder_hidden_states=encoder_hidden_states,
+                class_labels=class_labels,
+                timestep_cond=timestep_cond,
+                attention_mask=attention_mask,
+                cross_attention_kwargs=cross_attention_kwargs,
+                added_cond_kwargs=added_cond_kwargs,
+                down_block_additional_residuals=down_block_additional_residuals,
+                mid_block_additional_residual=mid_block_additional_residual,
+                down_intrablock_additional_residuals=down_intrablock_additional_residuals,
+                encoder_attention_mask=encoder_attention_mask,
+                return_dict=return_dict,
+            )
+        return output
+
+    def forward_inner(
         self,
         sample: torch.FloatTensor,
         timestep: Union[torch.Tensor, float, int],

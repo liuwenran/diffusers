@@ -23,7 +23,11 @@ from .attention_processor import Attention
 from .embeddings import SinusoidalPositionalEmbedding
 from .lora import LoRACompatibleLinear
 from .normalization import AdaLayerNorm, AdaLayerNormZero
+import copy
 
+from enum import Enum
+
+AttentionStatus = Enum('ATTENTION_STATUS', 'READ WRITE DISABLE')
 
 @maybe_allow_in_graph
 class GatedSelfAttentionDense(nn.Module):
@@ -208,10 +212,28 @@ class BasicTransformerBlock(nn.Module):
         self._chunk_size = None
         self._chunk_dim = 0
 
+        self.attention_status = AttentionStatus.WRITE
+        self.context_to_save = None
+        self.bank = []
+
+    def set_attention_status(self, status):
+        if status:
+            self.attention_status = AttentionStatus.WRITE
+        else:
+            self.attention_status = AttentionStatus.READ
+
     def set_chunk_feed_forward(self, chunk_size: Optional[int], dim: int):
         # Sets chunk feed-forward
         self._chunk_size = chunk_size
         self._chunk_dim = dim
+
+    def clear_bank(self):
+        del self.bank
+        self.bank = []
+        self.context_to_save = None
+        import gc
+        gc.collect()
+        torch.cuda.empty_cache()
 
     def forward(
         self,
@@ -255,12 +277,40 @@ class BasicTransformerBlock(nn.Module):
         cross_attention_kwargs = cross_attention_kwargs.copy() if cross_attention_kwargs is not None else {}
         gligen_kwargs = cross_attention_kwargs.pop("gligen", None)
 
-        attn_output = self.attn1(
-            norm_hidden_states,
-            encoder_hidden_states=encoder_hidden_states if self.only_cross_attention else None,
-            attention_mask=attention_mask,
-            **cross_attention_kwargs,
-        )
+        attn_output = None
+        injection_weight = 2
+        self_attention_context = norm_hidden_states
+        if self.attention_status == AttentionStatus.WRITE:
+            self.context_to_save = self_attention_context
+            # self.bank.append(context_to_save)
+        if self.attention_status == AttentionStatus.READ:
+            # if len(self.bank) > 0:
+            if self.context_to_save is not None:
+                # self.bank = self.bank * injection_weight
+                self.bank = [self.context_to_save] * injection_weight
+                attn_output = self.attn1(
+                    norm_hidden_states,
+                    encoder_hidden_states=torch.cat(
+                        [self_attention_context] + self.bank, dim=1))
+                # attn_output = self.attn1(
+                #     norm_hidden_states,
+                #     encoder_hidden_states=self.bank[0])
+            # self.bank = []
+            self.context_to_save = None
+        if attn_output is None:
+            attn_output = self.attn1(
+                norm_hidden_states,
+                encoder_hidden_states=encoder_hidden_states if self.only_cross_attention else None,
+                attention_mask=attention_mask,
+                **cross_attention_kwargs,
+            )
+
+        # attn_output = self.attn1(
+        #     norm_hidden_states,
+        #     encoder_hidden_states=encoder_hidden_states if self.only_cross_attention else None,
+        #     attention_mask=attention_mask,
+        #     **cross_attention_kwargs,
+        # )
         if self.use_ada_layer_norm_zero:
             attn_output = gate_msa.unsqueeze(1) * attn_output
         elif self.use_ada_layer_norm_single:
