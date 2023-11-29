@@ -14,7 +14,7 @@ print(f'MIN {MIN_IND} MAX {MAX_IND}')
 # initialize the models and pipeline
 weight_dtype = torch.float16
 
-controlnet_conditioning_scale = 0.6  # recommended for good generalization
+controlnet_conditioning_scale = 1.0  # recommended for good generalization
 # controlnet = ControlNetModel.from_pretrained(
 #     "diffusers/controlnet-canny-sdxl-1.0", torch_dtype=weight_dtype
 # )
@@ -82,7 +82,7 @@ for ind, line in enumerate(lines):
         lines[ind] = lines[0]
         lines[0] = temp
 
-for picset in range(1, 5):
+for picset in range(5):
     for ind, line in enumerate(lines):
         print('image ind ' + str(ind))
         line = line.strip()
@@ -115,16 +115,18 @@ for picset in range(1, 5):
         image = np.concatenate([image, image, image], axis=2)
         canny_image = Image.fromarray(image)
 
-        folder_path = 'results/dongtinglan/lora-trained-xl-qianqiuhuman-e4-checkpoint-300_origin'
+        folder_path = 'results/dongtinglan/lora-trained-xl-qianqiuhuman-e4-checkpoint-300_origin_weight1'
         folder_path = os.path.join(folder_path, f'attn_set{picset}')
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
         generator = torch.Generator(device=torch.device('cuda')).manual_seed(picset)
         if ind == 0:
+            controlnet_conditioning_scale = 0.6
             image = pipeline(prompt, controlnet_conditioning_scale=controlnet_conditioning_scale, generator=generator, num_inference_steps=25, image=canny_image).images[0]
             front_image = image
         else:
+            controlnet_conditioning_scale = 1.0
             image = pipeline(prompt, controlnet_conditioning_scale=controlnet_conditioning_scale, generator=generator, num_inference_steps=25, image=canny_image, ref_image=front_image).images[0]
         image.save(os.path.join(folder_path, str(ind) + ".png"))
         pipeline.unet.clear_bank()
