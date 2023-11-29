@@ -46,6 +46,7 @@ import diffusers
 from diffusers import (
     AutoencoderKL,
     DDPMScheduler,
+    DPMSolverMultistepScheduler,
     StableDiffusionXLPipeline,
     UNet2DConditionModel,
 )
@@ -270,6 +271,24 @@ def parse_args(input_args=None):
         default=1024,
         help=(
             "The resolution for input images, all the images in the train/validation dataset will be resized to this"
+            " resolution"
+        ),
+    )
+    parser.add_argument(
+        "--resolution_h",
+        type=int,
+        default=1024,
+        help=(
+            "The resolution h for input images, all the images in the train/validation dataset will be resized to this"
+            " resolution"
+        ),
+    )
+    parser.add_argument(
+        "--resolution_w",
+        type=int,
+        default=1024,
+        help=(
+            "The resolution wfor input images, all the images in the train/validation dataset will be resized to this"
             " resolution"
         ),
     )
@@ -869,8 +888,8 @@ def main(args):
         return tokens_one, tokens_two
 
     # Preprocessing the datasets.
-    train_resize = transforms.Resize(args.resolution, interpolation=transforms.InterpolationMode.BILINEAR)
-    train_crop = transforms.CenterCrop(args.resolution) if args.center_crop else transforms.RandomCrop(args.resolution)
+    train_resize = transforms.Resize((args.resolution_h, args.resolution_w), interpolation=transforms.InterpolationMode.BILINEAR)
+    train_crop = transforms.CenterCrop((args.resolution_h, args.resolution_w)) if args.center_crop else transforms.RandomCrop((args.resolution_h, args.resolution_w))
     train_flip = transforms.RandomHorizontalFlip(p=1.0)
     train_transforms = transforms.Compose(
         [
@@ -889,11 +908,11 @@ def main(args):
             original_sizes.append((image.height, image.width))
             image = train_resize(image)
             if args.center_crop:
-                y1 = max(0, int(round((image.height - args.resolution) / 2.0)))
-                x1 = max(0, int(round((image.width - args.resolution) / 2.0)))
+                y1 = max(0, int(round((image.height - args.resolution_h) / 2.0)))
+                x1 = max(0, int(round((image.width - args.resolution_w) / 2.0)))
                 image = train_crop(image)
             else:
-                y1, x1, h, w = train_crop.get_params(image, (args.resolution, args.resolution))
+                y1, x1, h, w = train_crop.get_params(image, (args.resolution_h, args.resolution_w))
                 image = crop(image, y1, x1, h, w)
             if args.random_flip and random.random() < 0.5:
                 # flip
@@ -1068,7 +1087,7 @@ def main(args):
                 # time ids
                 def compute_time_ids(original_size, crops_coords_top_left):
                     # Adapted from pipeline.StableDiffusionXLPipeline._get_add_time_ids
-                    target_size = (args.resolution, args.resolution)
+                    target_size = (args.resolution_h, args.resolution_w)
                     add_time_ids = list(original_size + crops_coords_top_left + target_size)
                     add_time_ids = torch.tensor([add_time_ids])
                     add_time_ids = add_time_ids.to(accelerator.device, dtype=weight_dtype)
@@ -1176,6 +1195,68 @@ def main(args):
 
             if global_step >= args.max_train_steps:
                 break
+            
+            if step % 50 == 0 and accelerator.is_main_process:
+                if args.validation_prompt is not None and epoch % args.validation_epochs == 0:
+                    logger.info(
+                        f"Running validation... \n Generating {args.num_validation_images} images with prompt:"
+                        f" {args.validation_prompt}."
+                    )
+                    # create pipeline
+                    pipeline = StableDiffusionXLPipeline.from_pretrained(
+                        args.pretrained_model_name_or_path,
+                        vae=vae,
+                        text_encoder=accelerator.unwrap_model(text_encoder_one),
+                        text_encoder_2=accelerator.unwrap_model(text_encoder_two),
+                        unet=accelerator.unwrap_model(unet),
+                        revision=args.revision,
+                        torch_dtype=weight_dtype,
+                    )
+
+                    # We train on the simplified learning objective. If we were previously predicting a variance, we need the scheduler to ignore it
+                    scheduler_args = {}
+
+                    if "variance_type" in pipeline.scheduler.config:
+                        variance_type = pipeline.scheduler.config.variance_type
+
+                        if variance_type in ["learned", "learned_range"]:
+                            variance_type = "fixed_small"
+
+                        scheduler_args["variance_type"] = variance_type
+
+                    pipeline.scheduler = DPMSolverMultistepScheduler.from_config(
+                        pipeline.scheduler.config, **scheduler_args
+                    )
+
+                    pipeline = pipeline.to(accelerator.device)
+                    pipeline.set_progress_bar_config(disable=True)
+
+                    # run inference
+                    generator = torch.Generator(device=accelerator.device).manual_seed(args.seed) if args.seed else None
+                    pipeline_args = {"prompt": args.validation_prompt}
+
+                    with torch.cuda.amp.autocast():
+                        images = [
+                            pipeline(**pipeline_args, generator=generator).images[0]
+                            for _ in range(args.num_validation_images)
+                        ]
+
+                    for tracker in accelerator.trackers:
+                        if tracker.name == "tensorboard":
+                            np_images = np.stack([np.asarray(img) for img in images])
+                            tracker.writer.add_images("validation", np_images, epoch, dataformats="NHWC")
+                        if tracker.name == "wandb":
+                            tracker.log(
+                                {
+                                    "validation": [
+                                        wandb.Image(image, caption=f"{i}: {args.validation_prompt}")
+                                        for i, image in enumerate(images)
+                                    ]
+                                }
+                            )
+
+                    del pipeline
+                    torch.cuda.empty_cache()
 
         if accelerator.is_main_process:
             if args.validation_prompt is not None and epoch % args.validation_epochs == 0:
