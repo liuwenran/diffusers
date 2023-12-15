@@ -133,9 +133,13 @@ EXAMPLE_DOC_STRING = """
 
 
 # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_img2img.retrieve_latents
-def retrieve_latents(encoder_output, generator):
-    if hasattr(encoder_output, "latent_dist"):
+def retrieve_latents(
+    encoder_output: torch.Tensor, generator: Optional[torch.Generator] = None, sample_mode: str = "sample"
+):
+    if hasattr(encoder_output, "latent_dist") and sample_mode == "sample":
         return encoder_output.latent_dist.sample(generator)
+    elif hasattr(encoder_output, "latent_dist") and sample_mode == "argmax":
+        return encoder_output.latent_dist.mode()
     elif hasattr(encoder_output, "latents"):
         return encoder_output.latents
     else:
@@ -151,9 +155,10 @@ class StableDiffusionXLControlNetImg2ImgPipeline(
     This model inherits from [`DiffusionPipeline`]. Check the superclass documentation for the generic methods the
     library implements for all the pipelines (such as downloading or saving, running on a particular device, etc.)
 
-    In addition the pipeline inherits the following loading methods:
-        - *Textual-Inversion*: [`loaders.TextualInversionLoaderMixin.load_textual_inversion`]
-        - *LoRA*: [`loaders.StableDiffusionXLLoraLoaderMixin.load_lora_weights`]
+    The pipeline also inherits the following loading methods:
+        - [`~loaders.TextualInversionLoaderMixin.load_textual_inversion`] for loading textual inversion embeddings
+        - [`~loaders.StableDiffusionXLLoraLoaderMixin.load_lora_weights`] for loading LoRA weights
+        - [`~loaders.StableDiffusionXLLoraLoaderMixin.save_lora_weights`] for saving LoRA weights
 
     Args:
         vae ([`AutoencoderKL`]):
