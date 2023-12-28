@@ -10,6 +10,7 @@ weight_dtype = torch.float16
 # pretrained_model_name_or_path = "/mnt/petrelfs/liuwenran/models/civitai/ckpts/copaxTimelessxlSDXL1_v8.safetensors"
 # pretrained_model_name_or_path = '/mnt/petrelfs/liuwenran/models/civitai/ckpts/protovisionXLHighFidelity3D_release0630Bakedvae.safetensors'
 pretrained_model_name_or_path = '/mnt/petrelfs/liuwenran/models/civitai/ckpts/leosamsHelloworldSDXL_helloworldSDXL30.safetensors'
+# pretrained_model_name_or_path = '/mnt/petrelfs/liuwenran/models/civitai/ckpts/xxmix9realisticsdxl_v10.safetensors'
 
 pipeline = StableDiffusionXLPipeline.from_single_file(pretrained_model_name_or_path, torch_dtype=weight_dtype)
 # vae_path = "madebyollin/sdxl-vae-fp16-fix"
@@ -49,7 +50,8 @@ pipeline = pipeline.to("cuda")
 # prompt = 'oil painting, a chinese old house, sunshine, perfect, extremely detailed'
 # prompt = 'a beautiful chinese woman, smiling, thin, pantyhose, black pantyhose, white sweater, black short skirt, black gloves, full-body photo, standing on snow ground, Gorgeous, charming, attractive, best quality, extremely detailed, sharp foucus, masterpeice, 8k, photorealistic, awesome, perfect'
 # prompt = 'leogirl,(pale skin, blush), (snow on stomach, snow on breasts, snow on legs), cold, highly detailed realistic photo of chinese beautiful (skinny) smiling woman standing in front of the (x-mas tree in busy city street:1.05), new year theme, Santa hat, nude and barefoot, (full body, feet), (winter, snow, frost, snowstorm:1.2), foggy evening, best quality, 8k, contrast lighting, detailed background,shot by iphone,'
-prompt = 'leogirl,(pale skin, blush),pink swimsuit, highly detailed realistic photo of chinese beautiful (skinny) smiling woman standing outside, barefoot, (full body, feet), (winter, snow, snow mountain), best quality, 8k, contrast lighting, detailed background,shot by iphone,'
+# prompt = 'leogirl,(pale skin, blush),pink swimsuit, highly detailed realistic photo of chinese beautiful (skinny) smiling woman standing outside, barefoot, (full body, feet), (winter, snow, snow mountain), best quality, 8k, contrast lighting, detailed background,shot by iphone,'
+prompt = 'leogirl, (pale skin, blush), black pantyhose, black bra, black skirt, highly detailed realistic photo of chinese beautiful (skinny) smiling woman standing outside, santa hat, (full body, feet), (winter, snow, snow mountain), best quality, 8k, contrast lighting, detailed background,shot by iphone,'
 
 
 # negative_prompt = 'disfigured, ugly, bad, immature, cartoon, 3d, painting, b&w'
@@ -58,7 +60,7 @@ negative_prompt = '(worst quality,low resolution,bad hands,open mouth),distorted
 
 generator = torch.Generator(device=torch.device('cuda')).manual_seed(1)
 
-folder_path = 'results/sd_xl_3d_copax/skiing_white_black_nudify_goodp_helloworld'
+folder_path = 'results/sd_xl_3d_copax/skiing_white_black_nudify_goodp_santa'
 if not os.path.exists(folder_path):
     os.makedirs(folder_path)
 

@@ -42,30 +42,37 @@ pipeline = StableDiffusionXLControlNetPipeline.from_pretrained(
 #     trained_ckpt, vae=vae, controlnet=controlnet, torch_dtype=weight_dtype
 # )
 
-pipeline.load_lora_weights("stabilityai/stable-diffusion-xl-base-1.0", weight_name="sd_xl_offset_example-lora_1.0.safetensors")
+# pipeline.load_lora_weights("stabilityai/stable-diffusion-xl-base-1.0", weight_name="sd_xl_offset_example-lora_1.0.safetensors")
 
-lora_dir = 'work_dirs/cctv/lora-trained-xl-willow-e4/checkpoint-300'
+# lora_dir = 'work_dirs/cctv/lora-trained-xl-willow-e4/checkpoint-300'
+# lora_dir = 'work_dirs/cctv/qianqiushisong3/lora-trained-xl-weiqishaonian-e4/checkpoint-300'
 # lora_dir = 'work_dirs/t2i-changshiban/t2i-xiangsi-e4-fp16/checkpoint-600'
 # lora_dir = 'work_dirs/t2i-changshiban/t2i-changshiban-fullsize720-e4/checkpoint-3400'
+# lora_dir = 'work_dirs/cctv/qianqiushisong/lora-trained-xl-qianqiuhuman-e4/checkpoint-300'
+lora_dir = 'work_dirs/cctv/qianqiushisong3/lora-trained-xl-weiqishaonian-e4/checkpoint-300'
+
 pipeline.load_lora_weights(lora_dir)
 pipeline = pipeline.to("cuda")
 
 # prompt
 # lora_trigger = 'a photo in cartoon style, '
-lora_trigger = 'a old man in chinese cartoon style, '
+# lora_trigger = 'a old man in chinese cartoon style, '
 # lora_trigger = 'changshiban,'
+lora_trigger = 'a photo in cartoon style, '
 
 
 # role
 # role = '/mnt/petrelfs/liuwenran/datasets/角色视图/dongtinglan.txt'
 # role = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiugesong/角色视图/images.txt'
 # role = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong2/new_characters.txt'
-role = '/mnt/petrelfs/liuwenran/datasets/cctv/dongtinglan/sixpose.txt'
+# role = '/mnt/petrelfs/liuwenran/datasets/cctv/dongtinglan/sixpose.txt'
+role = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong3/roles/roles_dufu.txt'
 
 # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiugesong/角色视图/prompts.txt'
 # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong2/prompts.txt'
 # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong2/new_prompts.txt'
-prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/dongtinglan/prompt.txt'
+# prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/dongtinglan/prompt.txt'
+prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong3/roles/role_prompt.txt'
 
 prompt_lines = open(prompt_file, 'r').readlines()
 prompt_dict = {}
@@ -74,7 +81,6 @@ for line in prompt_lines:
     line_role = line.split(':')[0]
     line_prompt = line.split(':')[1]
     prompt_dict[line_role] = line_prompt
-
 
 lines = open(role, 'r').readlines()
 for ind, line in enumerate(lines):
@@ -91,7 +97,8 @@ for picset in range(5):
         role_name = line.split('/')[-2]
         img_name = role_name + '_' + line.split('/')[-1].split('.')[0]
 
-        prompt = 'an old chinese ancient officer, silver beard, Tang Dynasty, white clothes, black offical hat, black boots'
+        # prompt = 'an old chinese ancient officer, silver beard, Tang Dynasty, white clothes, black offical hat, black boots'
+        prompt = 'An old Chinese ancient official, in Tang Dynasty, black beard, black official hat, Brown uniform, black boots.'
         # prompt = None
         # for role in prompt_dict.keys():
         #     if role == role_name.split('6')[0].strip():
@@ -116,8 +123,8 @@ for picset in range(5):
         image = np.concatenate([image, image, image], axis=2)
         canny_image = Image.fromarray(image)
 
-        folder_path = 'results/dongtinglan/lora-trained-xl-willow2-e4-checkpoint-300'
-        folder_path = os.path.join(folder_path, f'attn_set{picset}')
+        folder_path = 'results/qianqiushisong3/lora-trained-xl-qianqiuhuman-e4-checkpoint-300'
+        folder_path = os.path.join(folder_path, role_name, f'set{picset}')
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 

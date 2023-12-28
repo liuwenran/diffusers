@@ -12,19 +12,15 @@ from PIL import Image
 
 
 # initialize the models and pipeline
-weight_dtype = torch.float16
+weight_dtype = torch.float32
 
-controlnet_conditioning_scale = 1.0  # recommended for good generalization
+controlnet_conditioning_scale = 0.7  # recommended for good generalization
 controlnet = ControlNetModel.from_pretrained(
-    "lllyasviel/sd-controlnet-canny", torch_dtype=weight_dtype
+    "lllyasviel/sd-controlnet-hed", torch_dtype=weight_dtype
 )
 
-# controlnet = ControlNetModel.from_pretrained(
-#     "lllyasviel/control_v11p_sd15_canny", torch_dtype=weight_dtype
-# )
-
 # pretrained_model_name_or_path = "runwayml/stable-diffusion-v1-5"
-pretrained_model_name_or_path = 'Linaqruf/anything-v3.0'
+pretrained_model_name_or_path = '/mnt/petrelfs/liuwenran/.cache/huggingface/hub/models--Linaqruf--anything-v3.0/snapshots/8323d54dcf89c90c39995b04ae43166520e8992a'
 pipeline = StableDiffusionControlNetPipeline.from_pretrained(
     pretrained_model_name_or_path, controlnet=controlnet, torch_dtype=weight_dtype
 )
@@ -45,13 +41,14 @@ pipeline = StableDiffusionControlNetPipeline.from_pretrained(
 # lora_dir = 'sd_15_loras/MoXinV1.safetensors'
 # lora_dir = 'sd_15_loras/shanshui-000004.safetensors'
 # lora_dir = 'sd_15_loras/wyy-000009.safetensors'
-# pipeline.load_lora_weights(lora_dir)
+lora_dir = 'work_dirs/test-lora15/checkpoint-500/pytorch_lora_weights.safetensors'
+pipeline.load_lora_weights(lora_dir)
 
 pipeline = pipeline.to("cuda")
 
 # prompt = "A photo of a chinese old man in cartoon style, Tang Dynasty, portrait, without hands, perfect, extremely detailed, 8k"
 # prompt = "A photo of chinese buildings in cartoon style, chinese ancient, Song Dynasty, without people, best quality, extremely detailed, good light"
-prompt = 'a chinese boy, Song dynasty, best quality,high quality,1boy'
+prompt = "A photo in chinese cartoon style, an oldman, best quality, extremely detailed"
 
 # lora_trigger = 'liujiyou, Chinese ink painting, '
 # lora_trigger = 'chinese peking opera '
@@ -60,32 +57,29 @@ prompt = 'a chinese boy, Song dynasty, best quality,high quality,1boy'
 # lora_trigger = 'ancient_chinese_indoors'
 # lora_trigger = 'daji'
 # lora_trigger = 'shuimobysim'
-# lora_trigger = ''
+lora_trigger = ''
 # lora_trigger = 'wyy_style'
 
-# prompt = lora_trigger + prompt
+prompt = lora_trigger + prompt
 
 generator = torch.Generator(device=torch.device('cuda')).manual_seed(1)
 
 # get canny image
-# image = load_image('/mnt/petrelfs/liuwenran/datasets/sichouzhilu/huizhan_1920.jpg')
-# image = load_image('/mnt/petrelfs/liuwenran/datasets/cctv/nantong/nantong_ref_480.jpg')
-image = load_image('/mnt/petrelfs/liuwenran/datasets/cctv/nantong/sixpose/正面.png')
+image = load_image('/mnt/petrelfs/liuwenran/datasets/cctv/dongtinglan/sixpose/董庭兰正.png')
+image = image.resize((480, 960))
 
-image = image.resize((480, 864))
+from controlnet_aux import HEDdetector
 
-image = np.array(image)
-image = cv2.Canny(image, 100, 200)
-image = image[:, :, None]
-image = np.concatenate([image, image, image], axis=2)
-canny_image = Image.fromarray(image)
+hed = HEDdetector.from_pretrained('lllyasviel/ControlNet')
 
-folder_path = 'results/sd_15_lora_canny/nantong_sd15_lora1'
+hed_image = hed(image)
+
+folder_path = 'results/sd_15_lora_hed/dongtinglan'
 if not os.path.exists(folder_path):
     os.makedirs(folder_path)
 
 for ind in range(10):
-    image = pipeline(prompt, controlnet_conditioning_scale=controlnet_conditioning_scale, generator=generator, num_inference_steps=50, image=canny_image).images[0]
+    image = pipeline(prompt, controlnet_conditioning_scale=controlnet_conditioning_scale, num_inference_steps=25, image=hed_image).images[0]
     image.save(os.path.join(folder_path, str(ind) + ".png"))
 
 

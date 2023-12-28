@@ -8,6 +8,7 @@ accelerate launch examples/dreambooth/train_dreambooth_lora.py \
   --output_dir=$OUTPUT_DIR \
   --train_text_encoder \
   --instance_prompt="a photo in chinese cartoon style, a man and a woman, willow" \
+  --mixed_precision="fp16" \
   --resolution=512 \
   --train_batch_size=1 \
   --gradient_accumulation_steps=1 \
