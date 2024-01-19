@@ -46,7 +46,10 @@ pipeline = StableDiffusionXLControlNetPipeline.from_pretrained(
 
 # lora_dir = 'work_dirs/cctv/qianqiushisong/lora-trained-xl-qianqiuhuman-e4/checkpoint-300/pytorch_lora_weights.safetensors'
 # lora_dir = 'work_dirs/cctv/qianqiushisong3/lora-trained-xl-dawangriji-children-e4/pytorch_lora_weights.safetensors'
-lora_dir = '/mnt/petrelfs/liuwenran/forks/diffusers/work_dirs/cctv/qianqiushisong3/lora-trained-xl-dawangriji-children-e4-600/checkpoint-600/pytorch_lora_weights.safetensors'
+# lora_dir = '/mnt/petrelfs/liuwenran/forks/diffusers/work_dirs/cctv/qianqiushisong3/lora-trained-xl-dawangriji-children-e4-600/checkpoint-600/pytorch_lora_weights.safetensors'
+# lora_dir = '/mnt/petrelfs/liuwenran/forks/diffusers/work_dirs/cctv/qianqiushisong3/lora-trained-xl-weiqishaonian-woman-e4/checkpoint-300/pytorch_lora_weights.safetensors'
+lora_dir = 'work_dirs/cctv/qianqiushisong3/lora-trained-xl-dawangriji-character-e4-600/checkpoint-600'
+# lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisong3/lora-trained-xl-weiqishaonian-character-v214-e4-300/checkpoint-300/pytorch_lora_weights.safetensors'
 
 # lora_dir = 'work_dirs/t2i-changshiban/t2i-xiangsi-e4-fp16/checkpoint-600'
 # lora_dir = 'work_dirs/t2i-changshiban/t2i-changshiban-fullsize720-e4/checkpoint-3400'
@@ -56,7 +59,7 @@ pipeline.load_lora_weights(lora_dir)
 pipeline = pipeline.to("cuda")
 
 # prompt
-lora_trigger = 'a photo in chinese cartoon style, '
+lora_trigger = 'characters in chinese cartoon style, '
 # lora_trigger = 'changshiban,'
 
 generator = torch.Generator(device=torch.device('cuda')).manual_seed(1)
@@ -91,8 +94,8 @@ for ind, line in enumerate(lines):
         role_name = line.split('/')[-2]
         img_name = role_name + '_' + line.split('/')[-1].split('.')[0]
 
-        prompt = 'an old chinese ancient officer'
-        # prompt = 'an old chinese officer, silver beard, white clothes, black offical hat, black boots'
+        # prompt = 'an old chinese ancient officer'
+        prompt = 'an old chinese officer, silver beard, white clothes, black offical hat, black boots'
         # prompt = None
         # for role in prompt_dict.keys():
         #     if role == role_name.split('6')[0].strip():
@@ -117,7 +120,7 @@ for ind, line in enumerate(lines):
         image = np.concatenate([image, image, image], axis=2)
         canny_image = Image.fromarray(image)
 
-        folder_path = 'results/qianqiushisong3/lora-trained-xl-dawangriji-children-600-0.6-e4-checkpoint-300_dufu'
+        folder_path = 'results/qianqiushisong3/lora-trained-xl-dawangriji-character-e4-600_dufu'
         folder_path = os.path.join(folder_path, img_name)
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
