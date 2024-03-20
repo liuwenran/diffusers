@@ -1,9 +1,9 @@
 export MODEL_NAME="stabilityai/stable-diffusion-xl-base-1.0"
 export INSTANCE_DIR="/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong3/new_styles/dawangriji_scene"
-export OUTPUT_DIR="work_dirs/cctv/qianqiushisong3/lora-trained-xl-dawangriji-scene-e4-600"
+export OUTPUT_DIR="work_dirs/cctv/qianqiushisong3/lora-trained-xl-test"
 export VAE_PATH="madebyollin/sdxl-vae-fp16-fix"
 
-accelerate launch examples/dreambooth/train_dreambooth_lora_sdxl.py \
+accelerate launch --num_processes 1 examples/dreambooth/train_dreambooth_lora_sdxl.py \
   --pretrained_model_name_or_path=$MODEL_NAME  \
   --instance_data_dir=$INSTANCE_DIR \
   --pretrained_vae_model_name_or_path=$VAE_PATH \

@@ -14,7 +14,7 @@ from PIL import Image
 # initialize the models and pipeline
 weight_dtype = torch.float16
 
-controlnet_conditioning_scale = 1.0  # recommended for good generalization
+controlnet_conditioning_scale = 0.4  # recommended for good generalization
 controlnet = ControlNetModel.from_pretrained(
     "diffusers/controlnet-canny-sdxl-1.0", torch_dtype=weight_dtype
 )
@@ -29,7 +29,7 @@ pipeline = StableDiffusionXLControlNetPipeline.from_pretrained(
     pretrained_model_name_or_path, vae=vae, controlnet=controlnet, torch_dtype=weight_dtype
 )
 
-pipeline.load_lora_weights("stabilityai/stable-diffusion-xl-base-1.0", weight_name="sd_xl_offset_example-lora_1.0.safetensors")
+# pipeline.load_lora_weights("stabilityai/stable-diffusion-xl-base-1.0", weight_name="sd_xl_offset_example-lora_1.0.safetensors")
 
 # trained_ckpt = 'work_dirs/t2i-changshiban/t2i-changshiban-trainckpt-e5-fp16'
 # pipeline = StableDiffusionXLControlNetPipeline.from_pretrained(
@@ -38,6 +38,8 @@ pipeline.load_lora_weights("stabilityai/stable-diffusion-xl-base-1.0", weight_na
 # pipeline.load_lora_weights("stabilityai/stable-diffusion-xl-base-1.0", weight_name="sd_xl_offset_example-lora_1.0.safetensors")
 
 # load attention processors
+# lora_dir = 'work_dirs/cctv/qianqiushisong/lora-trained-xl-qianqiuhuman-e4/checkpoint-300/pytorch_lora_weights.safetensors'
+
 # lora_dir = 'lora-trained-xl-fp16train3k'
 # lora_dir = 'lora-trained-xl-fp16train2k'
 # lora_dir = 'lora-trained-xl-fp16train3k/checkpoint-1200'
@@ -51,13 +53,13 @@ pipeline.load_lora_weights("stabilityai/stable-diffusion-xl-base-1.0", weight_na
 # lora_dir = 'loras/landscape-painting-sdxl_v2.safetensors'
 # lora_dir = 'work_dirs/lora-trained-xl-gufengperson-e4/checkpoint-300'
 # lora_dir = 'work_dirs/lora-trained-xl-gufengstreet-e4-640/checkpoint-300'
-# lora_dir = 'work_dirs/lora-trained-xl-xuanwu-e4/checkpoint-300'
+lora_dir = 'work_dirs/lora-trained-xl-xuanwu-e4/checkpoint-300'
 # lora_dir = 'work_dirs/lora-trained-xl-ancientpic-e4/checkpoint-300'
 # lora_dir = 'work_dirs/t2i-changshiban-e4-fp16/checkpoint-2700'
 # lora_dir = 'work_dirs/t2i-changshiban/t2i-changshiban-fullsize720-e4/checkpoint-3400'
 # lora_dir = 'work_dirs/cctv/lora-trained-xl-3dstyle-e4/checkpoint-300'
 # lora_dir = 'work_dirs/cctv/lora-trained-xl-comic-e4/checkpoint-300'
-lora_dir = 'work_dirs/cctv/lora-trained-xl-leyuan-e4/checkpoint-300'
+# lora_dir = 'work_dirs/cctv/lora-trained-xl-leyuan-e4/checkpoint-300'
 
 pipeline.load_lora_weights(lora_dir)
 
@@ -69,15 +71,19 @@ pipeline = pipeline.to("cuda")
 # prompt = "A photo of a man in chinese ancient style, chinese ink inpainting, Song Dynasty, without people, best quality, extremely detailed, good light"
 # prompt = "A photo of a man in chinese ancient style, chinese ink inpainting, Song Dynasty, best quality, extremely detailed, good light"
 # prompt = "A photo of a man in chinese ancient style, Tang Dynasty, best quality, extremely detailed, good light"
-# prompt = "A photo of street in chinese ancient style,chinese ink inpainting, white background, Song Dynasty, best quality, extremely detailed, good light"
+prompt = "A photo of street in chinese ancient style,chinese ink inpainting, white background, Song Dynasty, best quality, extremely detailed, good light"
 # prompt = 'painting, people, tree, elephant'
 # prompt = 'In the style of Chinese ink-and-wash painting, traditional Chinese realistic painting, Chinese ancient architecture, Night Scene in Chang an City, in Tang Dynasty'
 # prompt = 'Night Scene in Chang an City, in Tang Dynasty'
 # prompt = 'A young Chinese ancient male, in Tang Dynasty, tall and thin body type, very handsome, white official hat, white clothes with pattern, black boots.'
-prompt = 'An ancient Chinese boy, in Tang Dynasty, handsome, brown and beige clothes, white boots.'
+# prompt = 'An ancient Chinese boy, in Tang Dynasty, handsome, brown and beige clothes, white boots.'
+# prompt = 'Some dragons are circling, chinese cartoon style, Tang Dynasty, perfect, extremely detailed'
 
 # negative_prompt = 'yellow ground, gray ground'
+# negative_prompt = 'people, person, bad, blur'
+negative_prompt = 'blur, low quality'
 
+lora_trigger = 'a photo in chinese cartoon style, '
 # lora_trigger = 'liujiyou, Chinese ink painting, '
 # lora_trigger = 'chinese peking opera '
 # lora_trigger = 'QIEMANCN, '
@@ -85,7 +91,7 @@ prompt = 'An ancient Chinese boy, in Tang Dynasty, handsome, brown and beige clo
 # lora_trigger = 'changshiban, '
 # lora_trigger = 'a photo of chinese ancient drawing,'
 # lora_trigger = 'a photo of a man in cartoon style,'
-lora_trigger = 'a photo of a boy in cartoon style,'
+# lora_trigger = 'a photo of a boy in cartoon style,'
 prompt = lora_trigger + prompt
 
 generator = torch.Generator(device=torch.device('cuda')).manual_seed(1)
@@ -94,10 +100,14 @@ generator = torch.Generator(device=torch.device('cuda')).manual_seed(1)
 # image = load_image('/mnt/petrelfs/liuwenran/datasets/cctv/control/5_crop.jpg')
 # image = load_image('/mnt/petrelfs/liuwenran/datasets/cctv/qianqiugesong/scene/scene_content/场一 夜 外 长安城全景.png')
 # image = load_image('/mnt/petrelfs/liuwenran/datasets/cctv/donghuatest/content/libai.png')
-image = load_image('/mnt/petrelfs/liuwenran/datasets/cctv/donghuatest/content/xiaohai.png')
+# image = load_image('/mnt/petrelfs/liuwenran/datasets/cctv/donghuatest/content/xiaohai.png')
+image = load_image('/mnt/petrelfs/liuwenran/datasets/cctv/changeface/faces/liuwenran.jpg')
+
 # image = image.resize((832, 1280))
 # image = image.resize((1920, 960))
-image = image.resize((960, 1920))
+# image = image.resize((960, 1920))
+# image = image.resize((1024, 1024))
+image = image.resize((800, 1024))
 
 image = np.array(image)
 image = cv2.Canny(image, 100, 200)
@@ -105,10 +115,11 @@ image = image[:, :, None]
 image = np.concatenate([image, image, image], axis=2)
 canny_image = Image.fromarray(image)
 
-folder_path = 'results/t2i_sd_xl_lora_canny/lora-trained-xl-leyuan-e4-checkpoint-300_xiaohai'
+# folder_path = 'results/t2i_sd_xl_lora_canny/lora-trained-xl-leyuan-e4-checkpoint-300_xiaohai'
+folder_path = 'results/test_liuwenran'
 if not os.path.exists(folder_path):
     os.makedirs(folder_path)
 
 for ind in range(10):
-    image = pipeline(prompt, controlnet_conditioning_scale=controlnet_conditioning_scale, num_inference_steps=25, image=canny_image).images[0]
+    image = pipeline(prompt, negative_prompt=negative_prompt,controlnet_conditioning_scale=controlnet_conditioning_scale, num_inference_steps=25, image=canny_image).images[0]
     image.save(os.path.join(folder_path, str(ind) + ".png"))
