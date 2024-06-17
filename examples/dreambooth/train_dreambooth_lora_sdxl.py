@@ -407,6 +407,16 @@ def parse_args(input_args=None):
         ),
     )
     parser.add_argument(
+        "--width",
+        type=int,
+        default=1024,
+    )
+    parser.add_argument(
+        "--height",
+        type=int,
+        default=1024,
+    )
+    parser.add_argument(
         "--center_crop",
         default=False,
         action="store_true",
@@ -797,11 +807,11 @@ class DreamBoothDataset(Dataset):
                 # flip
                 image = train_flip(image)
             if args.center_crop:
-                y1 = max(0, int(round((image.height - args.resolution) / 2.0)))
-                x1 = max(0, int(round((image.width - args.resolution) / 2.0)))
+                y1 = max(0, int(round((image.height - args.height) / 2.0)))
+                x1 = max(0, int(round((image.width - args.width) / 2.0)))
                 image = train_crop(image)
             else:
-                y1, x1, h, w = train_crop.get_params(image, (args.resolution, args.resolution))
+                y1, x1, h, w = train_crop.get_params(image, (args.height, args.width))
                 image = crop(image, y1, x1, h, w)
             crop_top_left = (y1, x1)
             self.crop_top_lefts.append(crop_top_left)
@@ -1391,7 +1401,7 @@ def main(args):
         class_prompt=args.class_prompt,
         class_data_root=args.class_data_dir if args.with_prior_preservation else None,
         class_num=args.num_class_images,
-        size=args.resolution,
+        size=(args.height, args.width),
         repeats=args.repeats,
         center_crop=args.center_crop,
     )
@@ -1411,7 +1421,7 @@ def main(args):
 
     def compute_time_ids(original_size, crops_coords_top_left):
         # Adapted from pipeline.StableDiffusionXLPipeline._get_add_time_ids
-        target_size = (args.resolution, args.resolution)
+        target_size = (args.height, args.width)
         add_time_ids = list(original_size + crops_coords_top_left + target_size)
         add_time_ids = torch.tensor([add_time_ids])
         add_time_ids = add_time_ids.to(accelerator.device, dtype=weight_dtype)
