@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # coding=utf-8
-# Copyright 2023 The LCM team and the HuggingFace Inc. team. All rights reserved.
+# Copyright 2024 The LCM team and the HuggingFace Inc. team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import math
 import os
 import random
 import shutil
+from contextlib import nullcontext
 from pathlib import Path
 
 import accelerate
@@ -36,7 +37,7 @@ from accelerate.utils import ProjectConfiguration, set_seed
 from datasets import load_dataset
 from huggingface_hub import create_repo, upload_folder
 from packaging import version
-from peft import LoraConfig, get_peft_model_state_dict
+from peft import LoraConfig, get_peft_model_state_dict, set_peft_model_state_dict
 from torchvision import transforms
 from torchvision.transforms.functional import crop
 from tqdm.auto import tqdm
@@ -51,7 +52,13 @@ from diffusers import (
     UNet2DConditionModel,
 )
 from diffusers.optimization import get_scheduler
-from diffusers.utils import check_min_version, convert_state_dict_to_diffusers, is_wandb_available
+from diffusers.training_utils import cast_training_params, resolve_interpolation_mode
+from diffusers.utils import (
+    check_min_version,
+    convert_state_dict_to_diffusers,
+    convert_unet_state_dict_to_peft,
+    is_wandb_available,
+)
 from diffusers.utils.import_utils import is_xformers_available
 
 
@@ -59,12 +66,12 @@ if is_wandb_available():
     import wandb
 
 # Will error if the minimal version of diffusers is not installed. Remove at your own risks.
-check_min_version("0.24.0.dev0")
+check_min_version("0.30.0.dev0")
 
 logger = get_logger(__name__)
 
 DATASET_NAME_MAPPING = {
-    "lambdalabs/pokemon-blip-captions": ("image", "text"),
+    "lambdalabs/naruto-blip-captions": ("image", "text"),
 }
 
 
@@ -140,7 +147,12 @@ def log_validation(vae, args, accelerator, weight_dtype, step, unet=None, is_fin
 
     for _, prompt in enumerate(validation_prompts):
         images = []
-        with torch.autocast("cuda", dtype=weight_dtype):
+        if torch.backends.mps.is_available():
+            autocast_ctx = nullcontext()
+        else:
+            autocast_ctx = torch.autocast(accelerator.device.type, dtype=weight_dtype)
+
+        with autocast_ctx:
             images = pipeline(
                 prompt=prompt,
                 num_inference_steps=4,
@@ -174,7 +186,7 @@ def log_validation(vae, args, accelerator, weight_dtype, step, unet=None, is_fin
             logger_name = "test" if is_final_validation else "validation"
             tracker.log({logger_name: formatted_images})
         else:
-            logger.warn(f"image logging not implemented for {tracker.name}")
+            logger.warning(f"image logging not implemented for {tracker.name}")
 
         del pipeline
         gc.collect()
@@ -193,8 +205,9 @@ def append_dims(x, target_dims):
 
 # From LCMScheduler.get_scalings_for_boundary_condition_discrete
 def scalings_for_boundary_conditions(timestep, sigma_data=0.5, timestep_scaling=10.0):
-    c_skip = sigma_data**2 / ((timestep / 0.1) ** 2 + sigma_data**2)
-    c_out = (timestep / 0.1) / ((timestep / 0.1) ** 2 + sigma_data**2) ** 0.5
+    scaled_timestep = timestep_scaling * timestep
+    c_skip = sigma_data**2 / (scaled_timestep**2 + sigma_data**2)
+    c_out = scaled_timestep / (scaled_timestep**2 + sigma_data**2) ** 0.5
     return c_skip, c_out
 
 
@@ -397,6 +410,15 @@ def parse_args():
         ),
     )
     parser.add_argument(
+        "--interpolation_type",
+        type=str,
+        default="bilinear",
+        help=(
+            "The interpolation function used when resizing images to the desired resolution. Choose between `bilinear`,"
+            " `bicubic`, `box`, `nearest`, `nearest_exact`, `hamming`, and `lanczos`."
+        ),
+    )
+    parser.add_argument(
         "--center_crop",
         default=False,
         action="store_true",
@@ -534,6 +556,50 @@ def parse_args():
         default=64,
         help="The rank of the LoRA projection matrix.",
     )
+    parser.add_argument(
+        "--lora_alpha",
+        type=int,
+        default=64,
+        help=(
+            "The value of the LoRA alpha parameter, which controls the scaling factor in front of the LoRA weight"
+            " update delta_W. No scaling will be performed if this value is equal to `lora_rank`."
+        ),
+    )
+    parser.add_argument(
+        "--lora_dropout",
+        type=float,
+        default=0.0,
+        help="The dropout probability for the dropout layer added before applying the LoRA to each layer input.",
+    )
+    parser.add_argument(
+        "--lora_target_modules",
+        type=str,
+        default=None,
+        help=(
+            "A comma-separated string of target module keys to add LoRA to. If not set, a default list of modules will"
+            " be used. By default, LoRA will be applied to all conv and linear layers."
+        ),
+    )
+    parser.add_argument(
+        "--vae_encode_batch_size",
+        type=int,
+        default=8,
+        required=False,
+        help=(
+            "The batch size used when encoding (and decoding) images to latents (and vice versa) using the VAE."
+            " Encoding or decoding the whole batch at once may run into OOM issues."
+        ),
+    )
+    parser.add_argument(
+        "--timestep_scaling_factor",
+        type=float,
+        default=10.0,
+        help=(
+            "The multiplicative timestep scaling factor used when calculating the boundary scalings for LCM. The"
+            " higher the scaling is, the lower the approximation error, but the default value of 10.0 should typically"
+            " suffice."
+        ),
+    )
     # ----Mixed Precision----
     parser.add_argument(
         "--mixed_precision",
@@ -640,6 +706,12 @@ def encode_prompt(prompt_batch, text_encoders, tokenizers, is_train=True):
 
 
 def main(args):
+    if args.report_to == "wandb" and args.hub_token is not None:
+        raise ValueError(
+            "You cannot use both --report_to=wandb and --hub_token due to a security risk of exposing your token."
+            " Please use `huggingface-cli login` to authenticate with the Hub."
+        )
+
     logging_dir = Path(args.output_dir, args.logging_dir)
 
     accelerator_project_config = ProjectConfiguration(project_dir=args.output_dir, logging_dir=logging_dir)
@@ -776,10 +848,10 @@ def main(args):
     text_encoder_two.to(accelerator.device, dtype=weight_dtype)
 
     # 9. Add LoRA to the student U-Net, only the LoRA projection matrix will be updated by the optimizer.
-    lora_config = LoraConfig(
-        r=args.lora_rank,
-        lora_alpha=args.lora_rank,
-        target_modules=[
+    if args.lora_target_modules is not None:
+        lora_target_modules = [module_key.strip() for module_key in args.lora_target_modules.split(",")]
+    else:
+        lora_target_modules = [
             "to_q",
             "to_k",
             "to_v",
@@ -794,16 +866,14 @@ def main(args):
             "downsamplers.0.conv",
             "upsamplers.0.conv",
             "time_emb_proj",
-        ],
+        ]
+    lora_config = LoraConfig(
+        r=args.lora_rank,
+        target_modules=lora_target_modules,
+        lora_alpha=args.lora_alpha,
+        lora_dropout=args.lora_dropout,
     )
     unet.add_adapter(lora_config)
-
-    # Make sure the trainable params are in float32.
-    if args.mixed_precision == "fp16":
-        for param in unet.parameters():
-            # only upcast trainable parameters (LoRA) into fp32
-            if param.requires_grad:
-                param.data = param.to(torch.float32)
 
     # Also move the alpha and sigma noise schedules to accelerator.device.
     alpha_schedule = alpha_schedule.to(accelerator.device)
@@ -829,12 +899,30 @@ def main(args):
         def load_model_hook(models, input_dir):
             # load the LoRA into the model
             unet_ = accelerator.unwrap_model(unet)
-            lora_state_dict, network_alphas = StableDiffusionXLPipeline.lora_state_dict(input_dir)
-            StableDiffusionXLPipeline.load_lora_into_unet(lora_state_dict, network_alphas=network_alphas, unet=unet_)
+            lora_state_dict, _ = StableDiffusionXLPipeline.lora_state_dict(input_dir)
+            unet_state_dict = {
+                f'{k.replace("unet.", "")}': v for k, v in lora_state_dict.items() if k.startswith("unet.")
+            }
+            unet_state_dict = convert_unet_state_dict_to_peft(unet_state_dict)
+            incompatible_keys = set_peft_model_state_dict(unet_, unet_state_dict, adapter_name="default")
+            if incompatible_keys is not None:
+                # check only for unexpected keys
+                unexpected_keys = getattr(incompatible_keys, "unexpected_keys", None)
+                if unexpected_keys:
+                    logger.warning(
+                        f"Loading adapter weights from state_dict led to unexpected keys not found in the model: "
+                        f" {unexpected_keys}. "
+                    )
 
             for _ in range(len(models)):
                 # pop models so that they are not loaded again
                 models.pop()
+
+            # Make sure the trainable params are in float32. This is again needed since the base models
+            # are in `weight_dtype`. More details:
+            # https://github.com/huggingface/diffusers/pull/6514#discussion_r1449796804
+            if args.mixed_precision == "fp16":
+                cast_training_params(unet_, dtype=torch.float32)
 
         accelerator.register_save_state_pre_hook(save_model_hook)
         accelerator.register_load_state_pre_hook(load_model_hook)
@@ -846,7 +934,7 @@ def main(args):
 
             xformers_version = version.parse(xformers.__version__)
             if xformers_version == version.parse("0.0.16"):
-                logger.warn(
+                logger.warning(
                     "xFormers 0.0.16 cannot be used for training in some GPUs. If you observe problems during training, please update xFormers to at least 0.0.17. See https://huggingface.co/docs/diffusers/main/en/optimization/xformers for more details."
                 )
             unet.enable_xformers_memory_efficient_attention()
@@ -929,7 +1017,8 @@ def main(args):
             )
 
     # Preprocessing the datasets.
-    train_resize = transforms.Resize(args.resolution, interpolation=transforms.InterpolationMode.BILINEAR)
+    interpolation_mode = resolve_interpolation_mode(args.interpolation_type)
+    train_resize = transforms.Resize(args.resolution, interpolation=interpolation_mode)
     train_crop = transforms.CenterCrop(args.resolution) if args.center_crop else transforms.RandomCrop(args.resolution)
     train_flip = transforms.RandomHorizontalFlip(p=1.0)
     train_transforms = transforms.Compose([transforms.ToTensor(), transforms.Normalize([0.5], [0.5])])
@@ -1033,6 +1122,11 @@ def main(args):
             args.learning_rate * args.gradient_accumulation_steps * args.train_batch_size * accelerator.num_processes
         )
 
+    # Make sure the trainable params are in float32.
+    if args.mixed_precision == "fp16":
+        # only upcast trainable parameters (LoRA) into fp32
+        cast_training_params(unet, dtype=torch.float32)
+
     lr_scheduler = get_scheduler(
         args.lr_scheduler,
         optimizer=optimizer,
@@ -1121,11 +1215,11 @@ def main(args):
 
                 encoded_text = compute_embeddings_fn(text, orig_size, crop_coords)
 
-                # encode pixel values with batch size of at most 8
+                # encode pixel values with batch size of at most args.vae_encode_batch_size
                 pixel_values = pixel_values.to(dtype=vae.dtype)
                 latents = []
-                for i in range(0, pixel_values.shape[0], args.encode_batch_size):
-                    latents.append(vae.encode(pixel_values[i : i + args.encode_batch_size]).latent_dist.sample())
+                for i in range(0, pixel_values.shape[0], args.vae_encode_batch_size):
+                    latents.append(vae.encode(pixel_values[i : i + args.vae_encode_batch_size]).latent_dist.sample())
                 latents = torch.cat(latents, dim=0)
 
                 latents = latents * vae.config.scaling_factor
@@ -1142,9 +1236,13 @@ def main(args):
                 timesteps = torch.where(timesteps < 0, torch.zeros_like(timesteps), timesteps)
 
                 # 3. Get boundary scalings for start_timesteps and (end) timesteps.
-                c_skip_start, c_out_start = scalings_for_boundary_conditions(start_timesteps)
+                c_skip_start, c_out_start = scalings_for_boundary_conditions(
+                    start_timesteps, timestep_scaling=args.timestep_scaling_factor
+                )
                 c_skip_start, c_out_start = [append_dims(x, latents.ndim) for x in [c_skip_start, c_out_start]]
-                c_skip, c_out = scalings_for_boundary_conditions(timesteps)
+                c_skip, c_out = scalings_for_boundary_conditions(
+                    timesteps, timestep_scaling=args.timestep_scaling_factor
+                )
                 c_skip, c_out = [append_dims(x, latents.ndim) for x in [c_skip, c_out]]
 
                 # 4. Sample noise from the prior and add it to the latents according to the noise magnitude at each

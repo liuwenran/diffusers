@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2023 The HuggingFace Inc. team.
+# Copyright 2024 The HuggingFace Inc. team.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Conversion script for the Stable Diffusion checkpoints."""
+"""Conversion script for the Stable Diffusion checkpoints."""
 
 import re
 from contextlib import nullcontext
@@ -21,6 +21,7 @@ from typing import Dict, Optional, Union
 
 import requests
 import torch
+import yaml
 from transformers import (
     AutoFeatureExtractor,
     BertTokenizerFast,
@@ -50,8 +51,7 @@ from ...schedulers import (
     PNDMScheduler,
     UnCLIPScheduler,
 )
-from ...utils import is_accelerate_available, is_omegaconf_available, logging
-from ...utils.import_utils import BACKENDS_MAPPING
+from ...utils import is_accelerate_available, logging
 from ..latent_diffusion.pipeline_latent_diffusion import LDMBertConfig, LDMBertModel
 from ..paint_by_example import PaintByExampleImageEncoder
 from ..pipeline_utils import DiffusionPipeline
@@ -237,51 +237,54 @@ def create_unet_diffusers_config(original_config, image_size: int, controlnet=Fa
     Creates a config for the diffusers based on the config of the LDM model.
     """
     if controlnet:
-        unet_params = original_config.model.params.control_stage_config.params
+        unet_params = original_config["model"]["params"]["control_stage_config"]["params"]
     else:
-        if "unet_config" in original_config.model.params and original_config.model.params.unet_config is not None:
-            unet_params = original_config.model.params.unet_config.params
+        if (
+            "unet_config" in original_config["model"]["params"]
+            and original_config["model"]["params"]["unet_config"] is not None
+        ):
+            unet_params = original_config["model"]["params"]["unet_config"]["params"]
         else:
-            unet_params = original_config.model.params.network_config.params
+            unet_params = original_config["model"]["params"]["network_config"]["params"]
 
-    vae_params = original_config.model.params.first_stage_config.params.ddconfig
+    vae_params = original_config["model"]["params"]["first_stage_config"]["params"]["ddconfig"]
 
-    block_out_channels = [unet_params.model_channels * mult for mult in unet_params.channel_mult]
+    block_out_channels = [unet_params["model_channels"] * mult for mult in unet_params["channel_mult"]]
 
     down_block_types = []
     resolution = 1
     for i in range(len(block_out_channels)):
-        block_type = "CrossAttnDownBlock2D" if resolution in unet_params.attention_resolutions else "DownBlock2D"
+        block_type = "CrossAttnDownBlock2D" if resolution in unet_params["attention_resolutions"] else "DownBlock2D"
         down_block_types.append(block_type)
         if i != len(block_out_channels) - 1:
             resolution *= 2
 
     up_block_types = []
     for i in range(len(block_out_channels)):
-        block_type = "CrossAttnUpBlock2D" if resolution in unet_params.attention_resolutions else "UpBlock2D"
+        block_type = "CrossAttnUpBlock2D" if resolution in unet_params["attention_resolutions"] else "UpBlock2D"
         up_block_types.append(block_type)
         resolution //= 2
 
-    if unet_params.transformer_depth is not None:
+    if unet_params["transformer_depth"] is not None:
         transformer_layers_per_block = (
-            unet_params.transformer_depth
-            if isinstance(unet_params.transformer_depth, int)
-            else list(unet_params.transformer_depth)
+            unet_params["transformer_depth"]
+            if isinstance(unet_params["transformer_depth"], int)
+            else list(unet_params["transformer_depth"])
         )
     else:
         transformer_layers_per_block = 1
 
-    vae_scale_factor = 2 ** (len(vae_params.ch_mult) - 1)
+    vae_scale_factor = 2 ** (len(vae_params["ch_mult"]) - 1)
 
-    head_dim = unet_params.num_heads if "num_heads" in unet_params else None
+    head_dim = unet_params["num_heads"] if "num_heads" in unet_params else None
     use_linear_projection = (
-        unet_params.use_linear_in_transformer if "use_linear_in_transformer" in unet_params else False
+        unet_params["use_linear_in_transformer"] if "use_linear_in_transformer" in unet_params else False
     )
     if use_linear_projection:
         # stable diffusion 2-base-512 and 2-768
         if head_dim is None:
-            head_dim_mult = unet_params.model_channels // unet_params.num_head_channels
-            head_dim = [head_dim_mult * c for c in list(unet_params.channel_mult)]
+            head_dim_mult = unet_params["model_channels"] // unet_params["num_head_channels"]
+            head_dim = [head_dim_mult * c for c in list(unet_params["channel_mult"])]
 
     class_embed_type = None
     addition_embed_type = None
@@ -289,13 +292,15 @@ def create_unet_diffusers_config(original_config, image_size: int, controlnet=Fa
     projection_class_embeddings_input_dim = None
     context_dim = None
 
-    if unet_params.context_dim is not None:
+    if unet_params["context_dim"] is not None:
         context_dim = (
-            unet_params.context_dim if isinstance(unet_params.context_dim, int) else unet_params.context_dim[0]
+            unet_params["context_dim"]
+            if isinstance(unet_params["context_dim"], int)
+            else unet_params["context_dim"][0]
         )
 
     if "num_classes" in unet_params:
-        if unet_params.num_classes == "sequential":
+        if unet_params["num_classes"] == "sequential":
             if context_dim in [2048, 1280]:
                 # SDXL
                 addition_embed_type = "text_time"
@@ -303,14 +308,14 @@ def create_unet_diffusers_config(original_config, image_size: int, controlnet=Fa
             else:
                 class_embed_type = "projection"
             assert "adm_in_channels" in unet_params
-            projection_class_embeddings_input_dim = unet_params.adm_in_channels
+            projection_class_embeddings_input_dim = unet_params["adm_in_channels"]
 
     config = {
         "sample_size": image_size // vae_scale_factor,
-        "in_channels": unet_params.in_channels,
+        "in_channels": unet_params["in_channels"],
         "down_block_types": tuple(down_block_types),
         "block_out_channels": tuple(block_out_channels),
-        "layers_per_block": unet_params.num_res_blocks,
+        "layers_per_block": unet_params["num_res_blocks"],
         "cross_attention_dim": context_dim,
         "attention_head_dim": head_dim,
         "use_linear_projection": use_linear_projection,
@@ -322,15 +327,15 @@ def create_unet_diffusers_config(original_config, image_size: int, controlnet=Fa
     }
 
     if "disable_self_attentions" in unet_params:
-        config["only_cross_attention"] = unet_params.disable_self_attentions
+        config["only_cross_attention"] = unet_params["disable_self_attentions"]
 
-    if "num_classes" in unet_params and isinstance(unet_params.num_classes, int):
-        config["num_class_embeds"] = unet_params.num_classes
+    if "num_classes" in unet_params and isinstance(unet_params["num_classes"], int):
+        config["num_class_embeds"] = unet_params["num_classes"]
 
     if controlnet:
-        config["conditioning_channels"] = unet_params.hint_channels
+        config["conditioning_channels"] = unet_params["hint_channels"]
     else:
-        config["out_channels"] = unet_params.out_channels
+        config["out_channels"] = unet_params["out_channels"]
         config["up_block_types"] = tuple(up_block_types)
 
     return config
@@ -340,38 +345,38 @@ def create_vae_diffusers_config(original_config, image_size: int):
     """
     Creates a config for the diffusers based on the config of the LDM model.
     """
-    vae_params = original_config.model.params.first_stage_config.params.ddconfig
-    _ = original_config.model.params.first_stage_config.params.embed_dim
+    vae_params = original_config["model"]["params"]["first_stage_config"]["params"]["ddconfig"]
+    _ = original_config["model"]["params"]["first_stage_config"]["params"]["embed_dim"]
 
-    block_out_channels = [vae_params.ch * mult for mult in vae_params.ch_mult]
+    block_out_channels = [vae_params["ch"] * mult for mult in vae_params["ch_mult"]]
     down_block_types = ["DownEncoderBlock2D"] * len(block_out_channels)
     up_block_types = ["UpDecoderBlock2D"] * len(block_out_channels)
 
     config = {
         "sample_size": image_size,
-        "in_channels": vae_params.in_channels,
-        "out_channels": vae_params.out_ch,
+        "in_channels": vae_params["in_channels"],
+        "out_channels": vae_params["out_ch"],
         "down_block_types": tuple(down_block_types),
         "up_block_types": tuple(up_block_types),
         "block_out_channels": tuple(block_out_channels),
-        "latent_channels": vae_params.z_channels,
-        "layers_per_block": vae_params.num_res_blocks,
+        "latent_channels": vae_params["z_channels"],
+        "layers_per_block": vae_params["num_res_blocks"],
     }
     return config
 
 
 def create_diffusers_schedular(original_config):
     schedular = DDIMScheduler(
-        num_train_timesteps=original_config.model.params.timesteps,
-        beta_start=original_config.model.params.linear_start,
-        beta_end=original_config.model.params.linear_end,
+        num_train_timesteps=original_config["model"]["params"]["timesteps"],
+        beta_start=original_config["model"]["params"]["linear_start"],
+        beta_end=original_config["model"]["params"]["linear_end"],
         beta_schedule="scaled_linear",
     )
     return schedular
 
 
 def create_ldm_bert_config(original_config):
-    bert_params = original_config.model.params.cond_stage_config.params
+    bert_params = original_config["model"]["params"]["cond_stage_config"]["params"]
     config = LDMBertConfig(
         d_model=bert_params.n_embed,
         encoder_layers=bert_params.n_layer,
@@ -552,7 +557,7 @@ def convert_ldm_unet_checkpoint(
                 paths, new_checkpoint, unet_state_dict, additional_replacements=[meta_path], config=config
             )
 
-            output_block_list = {k: sorted(v) for k, v in output_block_list.items()}
+            output_block_list = {k: sorted(v) for k, v in sorted(output_block_list.items())}
             if ["conv.bias", "conv.weight"] in output_block_list.values():
                 index = list(output_block_list.values()).index(["conv.bias", "conv.weight"])
                 new_checkpoint[f"up_blocks.{block_id}.upsamplers.0.conv.weight"] = unet_state_dict[
@@ -1006,9 +1011,9 @@ def stable_unclip_image_encoder(original_config, local_files_only=False):
     encoders.
     """
 
-    image_embedder_config = original_config.model.params.embedder_config
+    image_embedder_config = original_config["model"]["params"]["embedder_config"]
 
-    sd_clip_image_embedder_class = image_embedder_config.target
+    sd_clip_image_embedder_class = image_embedder_config["target"]
     sd_clip_image_embedder_class = sd_clip_image_embedder_class.split(".")[-1]
 
     if sd_clip_image_embedder_class == "ClipImageEmbedder":
@@ -1047,8 +1052,8 @@ def stable_unclip_image_noising_components(
 
     If the noise augmentor config specifies a clip stats path, the `clip_stats_path` must be provided.
     """
-    noise_aug_config = original_config.model.params.noise_aug_config
-    noise_aug_class = noise_aug_config.target
+    noise_aug_config = original_config["model"]["params"]["noise_aug_config"]
+    noise_aug_class = noise_aug_config["target"]
     noise_aug_class = noise_aug_class.split(".")[-1]
 
     if noise_aug_class == "CLIPEmbeddingNoiseAugmentation":
@@ -1148,6 +1153,8 @@ def download_from_original_stable_diffusion_ckpt(
     controlnet: Optional[bool] = None,
     adapter: Optional[bool] = None,
     load_safety_checker: bool = True,
+    safety_checker: Optional[StableDiffusionSafetyChecker] = None,
+    feature_extractor: Optional[AutoFeatureExtractor] = None,
     pipeline_class: DiffusionPipeline = None,
     local_files_only=False,
     vae_path=None,
@@ -1200,6 +1207,12 @@ def download_from_original_stable_diffusion_ckpt(
             If `checkpoint_path` is in `safetensors` format, load checkpoint with safetensors instead of PyTorch.
         load_safety_checker (`bool`, *optional*, defaults to `True`):
             Whether to load the safety checker or not. Defaults to `True`.
+        safety_checker (`StableDiffusionSafetyChecker`, *optional*, defaults to `None`):
+            Safety checker to use. If this parameter is `None`, the function will load a new instance of
+            [StableDiffusionSafetyChecker] by itself, if needed.
+        feature_extractor (`AutoFeatureExtractor`, *optional*, defaults to `None`):
+            Feature extractor to use. If this parameter is `None`, the function will load a new instance of
+            [AutoFeatureExtractor] by itself, if needed.
         pipeline_class (`str`, *optional*, defaults to `None`):
             The pipeline class to use. Pass `None` to determine automatically.
         local_files_only (`bool`, *optional*, defaults to `False`):
@@ -1244,11 +1257,6 @@ def download_from_original_stable_diffusion_ckpt(
 
     if prediction_type == "v-prediction":
         prediction_type = "v_prediction"
-
-    if not is_omegaconf_available():
-        raise ValueError(BACKENDS_MAPPING["omegaconf"][1])
-
-    from omegaconf import OmegaConf
 
     if isinstance(checkpoint_path_or_dict, str):
         if from_safetensors:
@@ -1317,19 +1325,25 @@ def download_from_original_stable_diffusion_ckpt(
 
         if config_url is not None:
             original_config_file = BytesIO(requests.get(config_url).content)
+        else:
+            with open(original_config_file, "r") as f:
+                original_config_file = f.read()
+    else:
+        with open(original_config_file, "r") as f:
+            original_config_file = f.read()
 
-    original_config = OmegaConf.load(original_config_file)
+    original_config = yaml.safe_load(original_config_file)
 
     # Convert the text model.
     if (
         model_type is None
-        and "cond_stage_config" in original_config.model.params
-        and original_config.model.params.cond_stage_config is not None
+        and "cond_stage_config" in original_config["model"]["params"]
+        and original_config["model"]["params"]["cond_stage_config"] is not None
     ):
-        model_type = original_config.model.params.cond_stage_config.target.split(".")[-1]
+        model_type = original_config["model"]["params"]["cond_stage_config"]["target"].split(".")[-1]
         logger.debug(f"no `model_type` given, `model_type` inferred as: {model_type}")
-    elif model_type is None and original_config.model.params.network_config is not None:
-        if original_config.model.params.network_config.params.context_dim == 2048:
+    elif model_type is None and original_config["model"]["params"]["network_config"] is not None:
+        if original_config["model"]["params"]["network_config"]["params"]["context_dim"] == 2048:
             model_type = "SDXL"
         else:
             model_type = "SDXL-Refiner"
@@ -1354,7 +1368,7 @@ def download_from_original_stable_diffusion_ckpt(
     elif num_in_channels is None:
         num_in_channels = 4
 
-    if "unet_config" in original_config.model.params:
+    if "unet_config" in original_config["model"]["params"]:
         original_config["model"]["params"]["unet_config"]["params"]["in_channels"] = num_in_channels
 
     if (
@@ -1375,13 +1389,16 @@ def download_from_original_stable_diffusion_ckpt(
         if image_size is None:
             image_size = 512
 
-    if controlnet is None and "control_stage_config" in original_config.model.params:
+    if controlnet is None and "control_stage_config" in original_config["model"]["params"]:
         path = checkpoint_path_or_dict if isinstance(checkpoint_path_or_dict, str) else ""
         controlnet = convert_controlnet_checkpoint(
             checkpoint, original_config, path, image_size, upcast_attention, extract_ema
         )
 
-    num_train_timesteps = getattr(original_config.model.params, "timesteps", None) or 1000
+    if "timesteps" in original_config["model"]["params"]:
+        num_train_timesteps = original_config["model"]["params"]["timesteps"]
+    else:
+        num_train_timesteps = 1000
 
     if model_type in ["SDXL", "SDXL-Refiner"]:
         scheduler_dict = {
@@ -1400,8 +1417,15 @@ def download_from_original_stable_diffusion_ckpt(
         scheduler = EulerDiscreteScheduler.from_config(scheduler_dict)
         scheduler_type = "euler"
     else:
-        beta_start = getattr(original_config.model.params, "linear_start", None) or 0.02
-        beta_end = getattr(original_config.model.params, "linear_end", None) or 0.085
+        if "linear_start" in original_config["model"]["params"]:
+            beta_start = original_config["model"]["params"]["linear_start"]
+        else:
+            beta_start = 0.02
+
+        if "linear_end" in original_config["model"]["params"]:
+            beta_end = original_config["model"]["params"]["linear_end"]
+        else:
+            beta_end = 0.085
         scheduler = DDIMScheduler(
             beta_end=beta_end,
             beta_schedule="scaled_linear",
@@ -1435,7 +1459,7 @@ def download_from_original_stable_diffusion_ckpt(
         raise ValueError(f"Scheduler of type {scheduler_type} doesn't exist!")
 
     if pipeline_class == StableDiffusionUpscalePipeline:
-        image_size = original_config.model.params.unet_config.params.image_size
+        image_size = original_config["model"]["params"]["unet_config"]["params"]["image_size"]
 
     # Convert the UNet2DConditionModel model.
     unet_config = create_unet_diffusers_config(original_config, image_size=image_size)
@@ -1464,10 +1488,10 @@ def download_from_original_stable_diffusion_ckpt(
 
         if (
             "model" in original_config
-            and "params" in original_config.model
-            and "scale_factor" in original_config.model.params
+            and "params" in original_config["model"]
+            and "scale_factor" in original_config["model"]["params"]
         ):
-            vae_scaling_factor = original_config.model.params.scale_factor
+            vae_scaling_factor = original_config["model"]["params"]["scale_factor"]
         else:
             vae_scaling_factor = 0.18215  # default SD scaling factor
 
@@ -1514,8 +1538,8 @@ def download_from_original_stable_diffusion_ckpt(
                     unet=unet,
                     scheduler=scheduler,
                     controlnet=controlnet,
-                    safety_checker=None,
-                    feature_extractor=None,
+                    safety_checker=safety_checker,
+                    feature_extractor=feature_extractor,
                 )
                 if hasattr(pipe, "requires_safety_checker"):
                     pipe.requires_safety_checker = False
@@ -1535,8 +1559,8 @@ def download_from_original_stable_diffusion_ckpt(
                     unet=unet,
                     scheduler=scheduler,
                     low_res_scheduler=low_res_scheduler,
-                    safety_checker=None,
-                    feature_extractor=None,
+                    safety_checker=safety_checker,
+                    feature_extractor=feature_extractor,
                 )
 
             else:
@@ -1546,8 +1570,8 @@ def download_from_original_stable_diffusion_ckpt(
                     tokenizer=tokenizer,
                     unet=unet,
                     scheduler=scheduler,
-                    safety_checker=None,
-                    feature_extractor=None,
+                    safety_checker=safety_checker,
+                    feature_extractor=feature_extractor,
                 )
                 if hasattr(pipe, "requires_safety_checker"):
                     pipe.requires_safety_checker = False
@@ -1668,9 +1692,6 @@ def download_from_original_stable_diffusion_ckpt(
             feature_extractor = AutoFeatureExtractor.from_pretrained(
                 "CompVis/stable-diffusion-safety-checker", local_files_only=local_files_only
             )
-        else:
-            safety_checker = None
-            feature_extractor = None
 
         if controlnet:
             pipe = pipeline_class(
@@ -1803,11 +1824,6 @@ def download_controlnet_from_original_ckpt(
     use_linear_projection: Optional[bool] = None,
     cross_attention_dim: Optional[bool] = None,
 ) -> DiffusionPipeline:
-    if not is_omegaconf_available():
-        raise ValueError(BACKENDS_MAPPING["omegaconf"][1])
-
-    from omegaconf import OmegaConf
-
     if from_safetensors:
         from safetensors import safe_open
 
@@ -1827,12 +1843,14 @@ def download_controlnet_from_original_ckpt(
     while "state_dict" in checkpoint:
         checkpoint = checkpoint["state_dict"]
 
-    original_config = OmegaConf.load(original_config_file)
+    with open(original_config_file, "r") as f:
+        original_config_file = f.read()
+    original_config = yaml.safe_load(original_config_file)
 
     if num_in_channels is not None:
         original_config["model"]["params"]["unet_config"]["params"]["in_channels"] = num_in_channels
 
-    if "control_stage_config" not in original_config.model.params:
+    if "control_stage_config" not in original_config["model"]["params"]:
         raise ValueError("`control_stage_config` not present in original config")
 
     controlnet = convert_controlnet_checkpoint(
