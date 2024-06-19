@@ -12,7 +12,7 @@ import diffusers
 parser = argparse.ArgumentParser()
 parser.add_argument("--min", type=int)
 parser.add_argument("--max", type=int)
-parser.add_argument("--type", type=int)
+parser.add_argument("--type", type=int, default=0)
 args = parser.parse_args()
 MIN_IND = args.min
 MAX_IND = args.max
@@ -23,7 +23,7 @@ print(f'type {args.type} MIN {MIN_IND} MAX {MAX_IND}')
 # initialize the models and pipeline
 weight_dtype = torch.float16
 
-controlnet_conditioning_scale = 1.0  # recommended for good generalization
+controlnet_conditioning_scale = 0.5 # recommended for good generalization
 controlnet = ControlNetModel.from_pretrained(
     "diffusers/controlnet-canny-sdxl-1.0", torch_dtype=weight_dtype
 )
@@ -69,7 +69,7 @@ else:
 # lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisong3/lora-trained-xl-weiqishaonian-character-v214-e4-300/checkpoint-300/pytorch_lora_weights.safetensors'
 
 if args.type == 0:
-    lora_dir = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e1e2/loras/20240202-1706856411592-0008.safetensors'
+    # lora_dir = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e1e2/loras/20240202-1706856411592-0008.safetensors'
     # lora_dir = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e1/loras/Makoto Shinkai Style.safetensors'
     # lora_dir = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e1/loras/SDXL1.0_Essenz-series-by-AI_Characters_Style_YourNameWeatheringWithYouSuzumeMakotoShinkai-v1.4.safetensors'
     # lora_dir = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e1/loras/Sadamoto Yoshiyuki_XL_V2.safetensors'
@@ -80,17 +80,23 @@ if args.type == 0:
     # lora_dir = 'work_dirs/t2i-changshiban/t2i-changshiban-fullsize720-e4/checkpoint-3400'
     # lora_dir = 'work_dirs/cctv/qianqiushisong3/lora-trained-xl-weiqishaonian-e4/checkpoint-300/pytorch_lora_weights.safetensors'
     # lora_dir = 'work_dirs/cctv/qianqiushisong3/lora-trained-xl-weiqishaonian-e4/checkpoint-300/pytorch_lora_weights.safetensors'
+    lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shisong_shusai/pytorch_lora_weights.safetensors'
+    # lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shisong_chishang/pytorch_lora_weights.safetensors'
+    # lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shisong_chishang4/pytorch_lora_weights.safetensors'
+    # lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisong3/lora-trained-xl-shenhuagushi_people_single-v214-e4-300/pytorch_lora_weights.safetensors'
 
     pipeline.load_lora_weights(lora_dir)
 
     # prompt
     # lora_trigger = 'characters in chinese cartoon style, '
     # lora_trigger = 'changshiban,'
-    lora_trigger = 'chinese traditional minimalism, '
+    # lora_trigger = 'chinese traditional minimalism, '
     # lora_trigger = 'mn, chinese gongbi painting'
 # lora_trigger = 'Makoto Shinkai Style page, '
 # lora_trigger = 'anime screencap in mnst artstyle, '
 # lora_trigger = 'souryuu asuka langley'
+    lora_trigger = 'a photo in cartoon style, characters in animations, '
+    
 else:
     lora_trigger = ''
 
@@ -105,7 +111,15 @@ generator = torch.Generator(device=torch.device('cuda')).manual_seed(1)
 
 if args.type == 0:
     # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e1e2/all_characters/xiaoerchuidiao_role.txt'
-    role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e1e2/all_characters/xiaoerchuidiao_role_rework.txt'
+    # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e1e2/all_characters/xiaoerchuidiao_role_rework.txt'
+    # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/池上实拍角色/roles_front.txt'
+    # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/游子吟角色第一批/youziyin_roles.txt'
+    # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/游子吟角色第二批/youziyin_roles2.txt'
+    # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/出塞角色实拍/chusai_roles.txt'
+    # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/池上实拍角色/roles.txt'
+    # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/池上实拍角色/roles_xiaowa.txt'
+    # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/youziyin_roles_refine.txt'
+    role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/出塞角色实拍/chusai_roles_refine.txt'
 else:
     # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e1e2/all_characters/zaofabaidicheng_role.txt'
     # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e1e2/all_characters/zaofabaidicheng_role_rework.txt'
@@ -118,7 +132,12 @@ else:
 # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong2/new_prompts.txt'
 
 if args.type == 0:
-    prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e1e2/all_characters/xiaoerechuidiao.txt'
+    # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e1e2/all_characters/xiaoerechuidiao.txt'
+    # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/池上实拍角色/prompt.txt'
+    # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/youziyin_prompt.txt'
+    # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/出塞角色实拍/chusai_prompt.txt'
+    # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/youziyin_prompt_refine.txt'
+    prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/出塞角色实拍/chusai_prompt_refine.txt'
 else:
     prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e1e2/all_characters/zaofabaidicheng.txt'
 
@@ -132,7 +151,11 @@ for line in prompt_lines:
     prompt_dict[line_role] = line_prompt
 
 if args.type == 0:
-    output_root_path = 'results/cctv/qianqiushisong_s2e1_rework'
+    # output_root_path = 'results/cctv/qianqiushisong_s2e1_rework'
+    # output_root_path = 'results/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shisong_chishang4_xiaowa2'
+    # output_root_path = 'results/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shenhuagushi_people_single-v214-e4-300_youziyin_refine'
+    # output_root_path = 'results/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shisong_shusai'
+    output_root_path = 'results/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shisong_shusai_refine'
 else:
     output_root_path = 'results/cctv/qianqiushisong_s2e2_rework_4'
 
@@ -143,7 +166,7 @@ for ind, line in enumerate(lines):
         print('image ind ' + str(ind) + f' in {len(lines)}' + f' type {args.type}')
         line = line.strip()
         print(line)
-        role_name = line.split('/')[-1].split(' ')[0]
+        role_name = line.split('/')[-2]
         img_name = line.split('/')[-1].split('.')[0]
 
         # prompt = 'an old chinese man'
@@ -164,7 +187,7 @@ for ind, line in enumerate(lines):
         print(prompt)
 
         image = load_image(line)
-        image = image.resize((960, 1920))
+        image = image.resize((1080, 1920))
 
         image = np.array(image)
         image = cv2.Canny(image, 100, 200)
@@ -172,7 +195,7 @@ for ind, line in enumerate(lines):
         image = np.concatenate([image, image, image], axis=2)
         canny_image = Image.fromarray(image)
 
-        folder_path = os.path.join(output_root_path, img_name)
+        folder_path = os.path.join(output_root_path, f'{role_name}_{img_name}')
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 

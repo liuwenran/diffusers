@@ -14,7 +14,7 @@ print(f'MIN {MIN_IND} MAX {MAX_IND}')
 # initialize the models and pipeline
 weight_dtype = torch.float16
 
-controlnet_conditioning_scale = 1.0  # recommended for good generalization
+controlnet_conditioning_scale = 0.6  # recommended for good generalization
 # controlnet = ControlNetModel.from_pretrained(
 #     "diffusers/controlnet-canny-sdxl-1.0", torch_dtype=weight_dtype
 # )
@@ -49,7 +49,8 @@ pipeline = StableDiffusionXLControlNetPipeline.from_pretrained(
 # lora_dir = 'work_dirs/t2i-changshiban/t2i-xiangsi-e4-fp16/checkpoint-600'
 # lora_dir = 'work_dirs/t2i-changshiban/t2i-changshiban-fullsize720-e4/checkpoint-3400'
 # lora_dir = 'work_dirs/cctv/qianqiushisong/lora-trained-xl-qianqiuhuman-e4/checkpoint-300'
-lora_dir = 'work_dirs/cctv/qianqiushisong3/lora-trained-xl-weiqishaonian-e4/checkpoint-300'
+# lora_dir = 'work_dirs/cctv/qianqiushisong3/lora-trained-xl-weiqishaonian-e4/checkpoint-300'
+lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shisong_shusai/pytorch_lora_weights.safetensors'
 
 pipeline.load_lora_weights(lora_dir)
 pipeline = pipeline.to("cuda")
@@ -58,7 +59,7 @@ pipeline = pipeline.to("cuda")
 # lora_trigger = 'a photo in cartoon style, '
 # lora_trigger = 'a old man in chinese cartoon style, '
 # lora_trigger = 'changshiban,'
-lora_trigger = 'a photo in cartoon style, '
+lora_trigger = 'a photo in cartoon style, characters in animations, '
 
 
 # role
@@ -66,13 +67,16 @@ lora_trigger = 'a photo in cartoon style, '
 # role = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiugesong/角色视图/images.txt'
 # role = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong2/new_characters.txt'
 # role = '/mnt/petrelfs/liuwenran/datasets/cctv/dongtinglan/sixpose.txt'
-role = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong3/roles/roles_dufu.txt'
+# role = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong3/roles/roles_dufu.txt'
+# role = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/池上实拍角色/roles.txt'
+role = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/池上实拍角色/roles_front.txt'
 
 # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiugesong/角色视图/prompts.txt'
 # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong2/prompts.txt'
 # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong2/new_prompts.txt'
 # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/dongtinglan/prompt.txt'
-prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong3/roles/role_prompt.txt'
+# prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong3/roles/role_prompt.txt'
+prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/池上实拍角色/prompt.txt'
 
 prompt_lines = open(prompt_file, 'r').readlines()
 prompt_dict = {}
@@ -83,13 +87,13 @@ for line in prompt_lines:
     prompt_dict[line_role] = line_prompt
 
 lines = open(role, 'r').readlines()
-for ind, line in enumerate(lines):
-    if '正' in line:
-        temp = lines[ind]
-        lines[ind] = lines[0]
-        lines[0] = temp
+# for ind, line in enumerate(lines):
+#     if '正' in line:
+#         temp = lines[ind]
+#         lines[ind] = lines[0]
+#         lines[0] = temp
 
-for picset in range(5):
+for picset in range(1):
     for ind, line in enumerate(lines):
         print('image ind ' + str(ind))
         line = line.strip()
@@ -98,12 +102,12 @@ for picset in range(5):
         img_name = role_name + '_' + line.split('/')[-1].split('.')[0]
 
         # prompt = 'an old chinese ancient officer, silver beard, Tang Dynasty, white clothes, black offical hat, black boots'
-        prompt = 'An old Chinese ancient official, in Tang Dynasty, black beard, black official hat, Brown uniform, black boots.'
-        # prompt = None
-        # for role in prompt_dict.keys():
-        #     if role == role_name.split('6')[0].strip():
-        #         prompt = prompt_dict[role]
-        #         break
+        # prompt = 'An old Chinese ancient official, in Tang Dynasty, black beard, black official hat, Brown uniform, black boots.'
+        prompt = None
+        for role in prompt_dict.keys():
+            if role == role_name.split('6')[0].strip():
+                prompt = prompt_dict[role]
+                break
 
         if '背' in line:
             prompt = prompt + ',back view, '
@@ -123,7 +127,7 @@ for picset in range(5):
         image = np.concatenate([image, image, image], axis=2)
         canny_image = Image.fromarray(image)
 
-        folder_path = 'results/qianqiushisong3/lora-trained-xl-qianqiuhuman-e4-checkpoint-300'
+        folder_path = 'results/qianqiushisongs2e3e4e5/lora-trained-xl-shisong_shusai'
         folder_path = os.path.join(folder_path, role_name, f'set{picset}')
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
