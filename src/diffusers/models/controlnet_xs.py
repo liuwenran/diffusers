@@ -29,6 +29,7 @@ from .attention_processor import (
     AttentionProcessor,
     AttnAddedKVProcessor,
     AttnProcessor,
+    FusedAttnProcessor2_0,
 )
 from .controlnet import ControlNetConditioningEmbedding
 from .embeddings import TimestepEmbedding, Timesteps
@@ -880,7 +881,7 @@ class UNetControlNetXSModel(ModelMixin, ConfigMixin):
 
         def fn_recursive_add_processors(name: str, module: torch.nn.Module, processors: Dict[str, AttentionProcessor]):
             if hasattr(module, "get_processor"):
-                processors[f"{name}.processor"] = module.get_processor(return_deprecated_lora=True)
+                processors[f"{name}.processor"] = module.get_processor()
 
             for sub_name, child in module.named_children():
                 fn_recursive_add_processors(f"{name}.{sub_name}", child, processors)
@@ -1000,6 +1001,8 @@ class UNetControlNetXSModel(ModelMixin, ConfigMixin):
         for module in self.modules():
             if isinstance(module, Attention):
                 module.fuse_projections(fuse=True)
+
+        self.set_attn_processor(FusedAttnProcessor2_0())
 
     # Copied from diffusers.models.unets.unet_2d_condition.UNet2DConditionModel.unfuse_qkv_projections
     def unfuse_qkv_projections(self):
