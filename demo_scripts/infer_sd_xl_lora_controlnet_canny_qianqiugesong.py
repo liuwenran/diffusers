@@ -23,7 +23,7 @@ print(f'type {args.type} MIN {MIN_IND} MAX {MAX_IND}')
 # initialize the models and pipeline
 weight_dtype = torch.float16
 
-controlnet_conditioning_scale = 0.5 # recommended for good generalization
+controlnet_conditioning_scale = 0.7 # recommended for good generalization
 controlnet = ControlNetModel.from_pretrained(
     "diffusers/controlnet-canny-sdxl-1.0", torch_dtype=weight_dtype
 )
@@ -80,10 +80,10 @@ if args.type == 0:
     # lora_dir = 'work_dirs/t2i-changshiban/t2i-changshiban-fullsize720-e4/checkpoint-3400'
     # lora_dir = 'work_dirs/cctv/qianqiushisong3/lora-trained-xl-weiqishaonian-e4/checkpoint-300/pytorch_lora_weights.safetensors'
     # lora_dir = 'work_dirs/cctv/qianqiushisong3/lora-trained-xl-weiqishaonian-e4/checkpoint-300/pytorch_lora_weights.safetensors'
-    lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shisong_shusai/pytorch_lora_weights.safetensors'
+    # lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shisong_shusai/pytorch_lora_weights.safetensors'
     # lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shisong_chishang/pytorch_lora_weights.safetensors'
     # lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shisong_chishang4/pytorch_lora_weights.safetensors'
-    # lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisong3/lora-trained-xl-shenhuagushi_people_single-v214-e4-300/pytorch_lora_weights.safetensors'
+    lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisong3/lora-trained-xl-shenhuagushi_people_single-v214-e4-300/pytorch_lora_weights.safetensors'
 
     pipeline.load_lora_weights(lora_dir)
 
@@ -119,7 +119,15 @@ if args.type == 0:
     # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/池上实拍角色/roles.txt'
     # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/池上实拍角色/roles_xiaowa.txt'
     # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/youziyin_roles_refine.txt'
-    role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/出塞角色实拍/chusai_roles_refine.txt'
+    # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/出塞角色实拍/chusai_roles_refine.txt'
+    # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/池上实拍角色/roles_xiaowa_9toushen.txt'
+    # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/游子吟补充角色背面+prompt/imgs.txt'
+    # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/道具/游子吟道具/imgs.txt'
+    # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/道具/出塞道具/imgs.txt'
+    # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/道具/池上道具/imgs.txt'
+    # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/出塞风格李广大战匈奴/roles.txt'
+    # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/春夜喜雨神话故事风格补充/roles.txt'
+    role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/春夜喜雨神话故事风格补充/xiaozhu_roles.txt'
 else:
     # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e1e2/all_characters/zaofabaidicheng_role.txt'
     # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e1e2/all_characters/zaofabaidicheng_role_rework.txt'
@@ -137,7 +145,10 @@ if args.type == 0:
     # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/youziyin_prompt.txt'
     # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/出塞角色实拍/chusai_prompt.txt'
     # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/youziyin_prompt_refine.txt'
-    prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/出塞角色实拍/chusai_prompt_refine.txt'
+    # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/出塞角色实拍/chusai_prompt_refine.txt'
+    # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/游子吟补充角色背面+prompt/prompt.txt'
+    # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/出塞风格李广大战匈奴/prompt.txt'
+    prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/春夜喜雨神话故事风格补充/prompt.txt'
 else:
     prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e1e2/all_characters/zaofabaidicheng.txt'
 
@@ -155,7 +166,13 @@ if args.type == 0:
     # output_root_path = 'results/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shisong_chishang4_xiaowa2'
     # output_root_path = 'results/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shenhuagushi_people_single-v214-e4-300_youziyin_refine'
     # output_root_path = 'results/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shisong_shusai'
-    output_root_path = 'results/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shisong_shusai_refine'
+    # output_root_path = 'results/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shisong_shusai_refine'
+    # output_root_path = 'results/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shisong_shusai_tools'
+    # output_root_path = 'results/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shisong_shusai_liguang'
+    # output_root_path = 'results/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shisong_chishang4_xiaowa9toushen'
+    # output_root_path = 'results/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shisong_chishang4_tools'
+    # output_root_path = 'results/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shenhuagushi_people_single-v214-e4-300_youziyin_tools'
+    output_root_path = 'results/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shenhuagushi_people_single-v214-e4-300_xiaozhu'
 else:
     output_root_path = 'results/cctv/qianqiushisong_s2e2_rework_4'
 
@@ -168,6 +185,7 @@ for ind, line in enumerate(lines):
         print(line)
         role_name = line.split('/')[-2]
         img_name = line.split('/')[-1].split('.')[0]
+        # role_name = img_name
 
         # prompt = 'an old chinese man'
         # prompt = 'an old chinese officer, silver beard, white clothes, black offical hat, black boots'
@@ -176,6 +194,7 @@ for ind, line in enumerate(lines):
             if role == role_name:
                 prompt = prompt_dict[role]
                 break
+        # prompt = ', perfect, best quality, masterpeice'
 
         if '背' in line:
             prompt = prompt + ',back view, '
@@ -187,7 +206,18 @@ for ind, line in enumerate(lines):
         print(prompt)
 
         image = load_image(line)
-        image = image.resize((1080, 1920))
+
+        # human img
+        # image = image.resize((1080, 1920))
+        
+        # tools img
+        image_size = image.size
+        if image_size[0] < 512 or image_size[1] < 512:
+            new_size = (image_size[0] * 2, image_size[1] * 2)
+            image = image.resize(new_size)
+        elif image_size[0] > 2048 or image_size[1] > 2048:
+            new_size = (int(image_size[0] / 2), int(image_size[1] / 2))
+            image = image.resize(new_size)
 
         image = np.array(image)
         image = cv2.Canny(image, 100, 200)
