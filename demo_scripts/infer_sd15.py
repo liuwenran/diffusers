@@ -13,6 +13,7 @@ ckpt_path = '/mnt/petrelfs/liuwenran/.cache/huggingface/hub/models--runwayml--st
 pipe = StableDiffusionPipeline.from_pretrained(ckpt_path, torch_dtype=torch.float16, revision="fp16")
 pipe = pipe.to('cuda')
 
+import ipdb;ipdb.set_trace();
 pipe.scheduler = DDIMScheduler.from_config(pipe.scheduler.config)
 
 prompt = 'a beautiful chinese woman is dancing, perfect, best quality'
