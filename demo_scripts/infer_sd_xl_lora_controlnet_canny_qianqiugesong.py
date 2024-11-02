@@ -23,7 +23,7 @@ print(f'type {args.type} MIN {MIN_IND} MAX {MAX_IND}')
 # initialize the models and pipeline
 weight_dtype = torch.float16
 
-controlnet_conditioning_scale = 0.7 # recommended for good generalization
+controlnet_conditioning_scale = 0.4 # recommended for good generalization
 controlnet = ControlNetModel.from_pretrained(
     "diffusers/controlnet-canny-sdxl-1.0", torch_dtype=weight_dtype
 )
@@ -83,7 +83,14 @@ if args.type == 0:
     # lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shisong_shusai/pytorch_lora_weights.safetensors'
     # lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shisong_chishang/pytorch_lora_weights.safetensors'
     # lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shisong_chishang4/pytorch_lora_weights.safetensors'
-    lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisong3/lora-trained-xl-shenhuagushi_people_single-v214-e4-300/pytorch_lora_weights.safetensors'
+    # lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisong3/lora-trained-xl-shenhuagushi_people_single-v214-e4-300/pytorch_lora_weights.safetensors'
+    # lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisong_s3/style_shuimo/pytorch_lora_weights.safetensors'
+    # lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisong_s3/style_shuimosingle/pytorch_lora_weights.safetensors'
+    lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisong_s3/style_shouhuisingle/pytorch_lora_weights.safetensors'
+    # lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisong_s3/style_shuimosingle_green/pytorch_lora_weights.safetensors'
+    # lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisong_s3/style_xianxia/pytorch_lora_weights.safetensors'
+    # lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisong_s3/style_xianxiasingle/pytorch_lora_weights.safetensors'
+    # lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisong_s3/style_chuantong/pytorch_lora_weights.safetensors'
 
     pipeline.load_lora_weights(lora_dir)
 
@@ -95,7 +102,7 @@ if args.type == 0:
 # lora_trigger = 'Makoto Shinkai Style page, '
 # lora_trigger = 'anime screencap in mnst artstyle, '
 # lora_trigger = 'souryuu asuka langley'
-    lora_trigger = 'a photo in cartoon style, characters in animations, '
+    lora_trigger = 'a photo in chinese cartoon style, characters in animations, '
     
 else:
     lora_trigger = ''
@@ -127,7 +134,17 @@ if args.type == 0:
     # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/道具/池上道具/imgs.txt'
     # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/出塞风格李广大战匈奴/roles.txt'
     # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/春夜喜雨神话故事风格补充/roles.txt'
-    role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/春夜喜雨神话故事风格补充/xiaozhu_roles.txt'
+    # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/春夜喜雨神话故事风格补充/xiaozhu_roles.txt'
+    # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/出塞/roles.txt'
+    # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/国风水墨仙侠风格——望岳/roles.txt'
+    # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/国风手绘风格——悯农/roles.txt'
+    # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/仙侠风格——望庐山瀑布/roles.txt'
+    # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/传统二维风格——九月九日忆山东兄弟/roles.txt'
+    # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/后补/wanglushan_roles.txt'
+    # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/后补/minnong_roles.txt'
+    # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/千秋诗颂S3角色主角补充/wanglushan_roles.txt'
+    role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/千秋诗颂S3角色主角补充/minnong_roles.txt'
+    # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/千秋诗颂S3角色主角补充/wangyue_roles.txt'
 else:
     # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e1e2/all_characters/zaofabaidicheng_role.txt'
     # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e1e2/all_characters/zaofabaidicheng_role_rework.txt'
@@ -148,7 +165,17 @@ if args.type == 0:
     # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/出塞角色实拍/chusai_prompt_refine.txt'
     # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/游子吟补充角色背面+prompt/prompt.txt'
     # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/出塞风格李广大战匈奴/prompt.txt'
-    prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/春夜喜雨神话故事风格补充/prompt.txt'
+    # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e3e4e5/春夜喜雨神话故事风格补充/prompt.txt'
+    # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/出塞/congjun.txt'
+    # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/国风水墨仙侠风格——望岳/wangyue.txt'
+    # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/国风手绘风格——悯农/minnong.txt'
+    # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/仙侠风格——望庐山瀑布/wanglushan.txt'
+    # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/传统二维风格——九月九日忆山东兄弟/yishandong.txt'
+    # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/后补/wanlgushan_prompt.txt'
+    # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/后补/minnong_prompt.txt'
+    # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/千秋诗颂S3角色主角补充/wanglushan_prompt.txt'
+    prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/千秋诗颂S3角色主角补充/minnong_prompt.txt'
+    # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/千秋诗颂S3角色主角补充/wangyue_prompt.txt'
 else:
     prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e1e2/all_characters/zaofabaidicheng.txt'
 
@@ -172,7 +199,16 @@ if args.type == 0:
     # output_root_path = 'results/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shisong_chishang4_xiaowa9toushen'
     # output_root_path = 'results/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shisong_chishang4_tools'
     # output_root_path = 'results/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shenhuagushi_people_single-v214-e4-300_youziyin_tools'
-    output_root_path = 'results/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shenhuagushi_people_single-v214-e4-300_xiaozhu'
+    # output_root_path = 'results/cctv/qianqiushisongs2e3e4e5/lora-trained-xl-shenhuagushi_people_single-v214-e4-300_xiaozhu'
+    # output_root_path = 'results/cctv/qianqiushisong_s3/lora-trained-xl-shisong_shusai_congjun'
+    # output_root_path = 'results/cctv/qianqiushisong_s3/style_shuimosingle_wangyue'
+    # output_root_path = 'results/cctv/qianqiushisong_s3/style_shuimosingle_green_houbu_wanglushang'
+    # output_root_path = 'results/cctv/qianqiushisong_s3/style_xianxiasingle_houbu_wanglushan'
+    # output_root_path = 'results/cctv/qianqiushisong_s3/style_chuantong_yishandong_04'
+    # output_root_path = 'results/cctv/qianqiushisong_s3/style_shouhuisingle_houbu_minnong'
+    # output_root_path = 'results/cctv/qianqiushisong_s3/style_xianxiasingle_zhujue_wanglushan'
+    output_root_path = 'results/cctv/qianqiushisong_s3/style_shouhuisingle_zhujue_minnong'
+    # output_root_path = 'results/cctv/qianqiushisong_s3/style_shuimosingle_green_zhujue_wangyue'
 else:
     output_root_path = 'results/cctv/qianqiushisong_s2e2_rework_4'
 
@@ -208,16 +244,16 @@ for ind, line in enumerate(lines):
         image = load_image(line)
 
         # human img
-        # image = image.resize((1080, 1920))
+        image = image.resize((1080, 1920))
         
         # tools img
-        image_size = image.size
-        if image_size[0] < 512 or image_size[1] < 512:
-            new_size = (image_size[0] * 2, image_size[1] * 2)
-            image = image.resize(new_size)
-        elif image_size[0] > 2048 or image_size[1] > 2048:
-            new_size = (int(image_size[0] / 2), int(image_size[1] / 2))
-            image = image.resize(new_size)
+        # image_size = image.size
+        # if image_size[0] < 512 or image_size[1] < 512:
+        #     new_size = (image_size[0] * 2, image_size[1] * 2)
+        #     image = image.resize(new_size)
+        # elif image_size[0] > 2048 or image_size[1] > 2048:
+        #     new_size = (int(image_size[0] / 2), int(image_size[1] / 2))
+        #     image = image.resize(new_size)
 
         image = np.array(image)
         image = cv2.Canny(image, 100, 200)

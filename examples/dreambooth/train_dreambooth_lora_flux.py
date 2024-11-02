@@ -1684,7 +1684,7 @@ def main(args):
                 )
 
                 # handle guidance
-                if transformer.config.guidance_embeds:
+                if transformer.module.config.guidance_embeds:
                     guidance = torch.tensor([args.guidance_scale], device=accelerator.device)
                     guidance = guidance.expand(model_input.shape[0])
                 else:
