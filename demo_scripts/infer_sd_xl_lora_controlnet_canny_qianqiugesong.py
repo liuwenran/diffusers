@@ -23,7 +23,7 @@ print(f'type {args.type} MIN {MIN_IND} MAX {MAX_IND}')
 # initialize the models and pipeline
 weight_dtype = torch.float16
 
-controlnet_conditioning_scale = 0.4 # recommended for good generalization
+controlnet_conditioning_scale = 0.6 # recommended for good generalization
 controlnet = ControlNetModel.from_pretrained(
     "diffusers/controlnet-canny-sdxl-1.0", torch_dtype=weight_dtype
 )
@@ -41,9 +41,7 @@ vae = AutoencoderKL.from_pretrained(
 # vae = AutoencoderKL.from_single_file('/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e1/ckpts/sdxl_vae.safetensors')
 
 if args.type == 0:
-# pretrained_model_name_or_path = "stabilityai/stable-diffusion-xl-base-1.0"
-# pretrained_model_name_or_path = '/mnt/petrelfs/liuwenran/.cache/huggingface/hub/models--gsdf--CounterfeitXL/snapshots/4708675873bd09833aabc3fd4cb2de5fcd1726ac'
-    pretrained_model_name_or_path = '/mnt/petrelfs/liuwenran/.cache/huggingface/hub/models--stabilityai--stable-diffusion-xl-base-1.0/snapshots/462165984030d82259a11f4367a4eed129e94a7b'
+    pretrained_model_name_or_path = "stabilityai/stable-diffusion-xl-base-1.0"
     pipeline = StableDiffusionXLControlNetPipeline.from_pretrained(
         pretrained_model_name_or_path, vae=vae, controlnet=controlnet, torch_dtype=weight_dtype
     )
@@ -86,11 +84,17 @@ if args.type == 0:
     # lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisong3/lora-trained-xl-shenhuagushi_people_single-v214-e4-300/pytorch_lora_weights.safetensors'
     # lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisong_s3/style_shuimo/pytorch_lora_weights.safetensors'
     # lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisong_s3/style_shuimosingle/pytorch_lora_weights.safetensors'
-    lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisong_s3/style_shouhuisingle/pytorch_lora_weights.safetensors'
+    # lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisong_s3/style_shouhuisingle/pytorch_lora_weights.safetensors'
     # lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisong_s3/style_shuimosingle_green/pytorch_lora_weights.safetensors'
     # lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisong_s3/style_xianxia/pytorch_lora_weights.safetensors'
     # lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisong_s3/style_xianxiasingle/pytorch_lora_weights.safetensors'
     # lora_dir = '/mnt/petrelfs/liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisong_s3/style_chuantong/pytorch_lora_weights.safetensors'
+    # lora_dir = '/home/liuwenran/cpfs01_liuwenran/petrelfs/old_version/diffusers/work_dirs/cctv/qianqiushisong_s4e1/shuifenyuanshangcaov2/pytorch_lora_weights.safetensors'
+    # lora_dir = '/home/liuwenran/cpfs01_liuwenran/petrelfs/old_version/diffusers/work_dirs/cctv/qianqiushisong_s4e1/guyuancao_child/pytorch_lora_weights.safetensors'
+    # lora_dir = '/home/liuwenran/cpfs01_liuwenran/petrelfs/old_version/diffusers/work_dirs/cctv/qianqiushisong_s4e1/shuifenyuanshangcaov3iter350/pytorch_lora_weights.safetensors'
+    lora_dir = '/home/liuwenran/cpfs01_liuwenran/old_version/diffusers/work_dirs/cctv/qianqiushisong_s4e2/gongbizengwanglun/pytorch_lora_weights.safetensors'
+    # lora_dir = '/home/liuwenran/cpfs01_liuwenran/petrelfs/old_version/diffusers/work_dirs/cctv/qianqiushisong_s4e3/huaji/pytorch_lora_weights.safetensors'
+    # lora_dir = '/home/liuwenran/cpfs01_liuwenran/petrelfs/old_version/diffusers/work_dirs/cctv/qianqiushisong_s4e3/huajiv2/pytorch_lora_weights.safetensors'
 
     pipeline.load_lora_weights(lora_dir)
 
@@ -143,8 +147,12 @@ if args.type == 0:
     # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/后补/wanglushan_roles.txt'
     # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/后补/minnong_roles.txt'
     # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/千秋诗颂S3角色主角补充/wanglushan_roles.txt'
-    role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/千秋诗颂S3角色主角补充/minnong_roles.txt'
+    # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/千秋诗颂S3角色主角补充/minnong_roles.txt'
     # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/千秋诗颂S3角色主角补充/wangyue_roles.txt'
+    # role_file = '/home/liuwenran/cpfs01_liuwenran/datasets/cctv/qianqiushisong_s4/content/赋得古原草送别/songbie_roles_round3_test.txt'
+    # role_file = '/home/liuwenran/cpfs01_liuwenran/datasets/cctv/qianqiushisong_s4/content/赠汪伦/zengwanglun_roles.txt'
+    role_file = '/home/liuwenran/cpfs01_liuwenran/datasets/cctv/qianqiushisong_s4/content/赠汪伦/zengwanglun_roles_shaofu.txt'
+    # role_file = '/home/liuwenran/cpfs01_liuwenran/datasets/cctv/qianqiushisong_s4/content/画鸡/huaji_roles.txt'
 else:
     # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e1e2/all_characters/zaofabaidicheng_role.txt'
     # role_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e1e2/all_characters/zaofabaidicheng_role_rework.txt'
@@ -174,8 +182,12 @@ if args.type == 0:
     # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/后补/wanlgushan_prompt.txt'
     # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/后补/minnong_prompt.txt'
     # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/千秋诗颂S3角色主角补充/wanglushan_prompt.txt'
-    prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/千秋诗颂S3角色主角补充/minnong_prompt.txt'
+    # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/千秋诗颂S3角色主角补充/minnong_prompt.txt'
     # prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s3/content/千秋诗颂S3角色主角补充/wangyue_prompt.txt'
+    # prompt_file = '/home/liuwenran/cpfs01_liuwenran/datasets/cctv/qianqiushisong_s4/content/赋得古原草送别/songbie_prompt.txt'
+    # prompt_file = '/home/liuwenran/cpfs01_liuwenran/datasets/cctv/qianqiushisong_s4/content/赠汪伦/zengwanglun_prompt.txt'
+    prompt_file = '/home/liuwenran/cpfs01_liuwenran/datasets/cctv/qianqiushisong_s4/content/赠汪伦/zengwanglun_prompt_shaofu.txt'
+    # prompt_file = '/home/liuwenran/cpfs01_liuwenran/datasets/cctv/qianqiushisong_s4/content/画鸡/huaji_prompt.txt'
 else:
     prompt_file = '/mnt/petrelfs/liuwenran/datasets/cctv/qianqiushisong_s2e1e2/all_characters/zaofabaidicheng.txt'
 
@@ -207,8 +219,14 @@ if args.type == 0:
     # output_root_path = 'results/cctv/qianqiushisong_s3/style_chuantong_yishandong_04'
     # output_root_path = 'results/cctv/qianqiushisong_s3/style_shouhuisingle_houbu_minnong'
     # output_root_path = 'results/cctv/qianqiushisong_s3/style_xianxiasingle_zhujue_wanglushan'
-    output_root_path = 'results/cctv/qianqiushisong_s3/style_shouhuisingle_zhujue_minnong'
+    # output_root_path = 'results/cctv/qianqiushisong_s3/style_shouhuisingle_zhujue_minnong'
     # output_root_path = 'results/cctv/qianqiushisong_s3/style_shuimosingle_green_zhujue_wangyue'
+    # output_root_path = 'results/cctv/qianqiushisong_s4e1/shuifenyuanshangcaov2iter350'
+    # output_root_path = 'results/cctv/qianqiushisong_s4e2/gongbizengwanglun_round4_test'
+    # output_root_path = 'results/cctv/qianqiushisong_s4e3/huaji_test'
+    # output_root_path = 'results/cctv/qianqiushisong_s4e3/huajiv2'
+    # output_root_path = 'results/cctv/qianqiushisong_s4e2/shuifenyuanshangcao_round2'
+    output_root_path = 'results/cctv/qianqiushisong_s4e2/gongbizengwanglun_test_dlc3'
 else:
     output_root_path = 'results/cctv/qianqiushisong_s2e2_rework_4'
 
@@ -238,7 +256,8 @@ for ind, line in enumerate(lines):
             prompt = prompt + ',side view,'
         elif '正' in line:
             prompt = prompt + ',front view,'
-        prompt = lora_trigger + prompt
+        # prompt = lora_trigger + prompt
+        prompt = lora_trigger  + prompt
         print(prompt)
 
         image = load_image(line)
